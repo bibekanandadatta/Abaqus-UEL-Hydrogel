@@ -126,14 +126,14 @@
 ! **********************************************************************
 
       ! make sure the relative directory is correct
-      include '../module/global_parameters.for'     ! global parameters module
-      include '../module/error_logging.for'         ! error/ debugging module
-      include '../module/linear_algebra.for'        ! linear algebra module
-      include '../module/nonlinear_solver.for'      ! nonlinear solver module
-      include '../module/lagrange_element.for'      ! Lagrange element module
-      include '../module/gauss_quadrature.for'      ! Guassian quadrature module
-      include '../module/solid_mechanics.for'       ! solid mechanics module
-      include '../module/post_processing.for'       ! post-processing module
+      include 'global_parameters.for'     ! global parameters module
+      include 'error_logging.for'         ! error/ debugging module
+      include 'linear_algebra.for'        ! linear algebra module
+      include 'nonlinear_solver.for'      ! nonlinear solver module
+      include 'lagrange_element.for'      ! Lagrange element module
+      include 'gauss_quadrature.for'      ! Guassian quadrature module
+      include 'solid_mechanics.for'       ! solid mechanics module
+      include 'post_processing.for'       ! post-processing module
 
 ! **********************************************************************
 ! **********************************************************************
@@ -669,9 +669,11 @@
       dPhidt    = (phi_new-phi_old)/dtime
 
       dCwdt     = - phi0*dPhidt/( Vw*(phi_new)**two )
+      ! dCwdt   = (Cw_new - Cw_old)/dtime
 
       !!!!!!!!!!!!!!!!!!!!! SOLVE INT PT VARIABLES !!!!!!!!!!!!!!!!!!!!!
 
+      
 
       !!!!!!!!!!!!!!!!!!!!!! TANGENT CALCULATION !!!!!!!!!!!!!!!!!!!!!!!
 
