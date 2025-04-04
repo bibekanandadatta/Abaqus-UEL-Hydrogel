@@ -1266,13 +1266,15 @@
       real(wp), intent(out)           :: RHS, AMATRX
       real(wp), intent(out), optional :: SVARS, ENERGY, PNEWDT
 
-      integer             :: nInt, nPostVars
-      integer             :: nDim, nStress
-      integer             :: uDOF, uDOFEL, mDOF, mDOFEL
+
       character(len=2)    :: analysis
       character(len=8)    :: abqProcedure
       logical             :: nlgeom
-
+      integer             :: nInt, nPostVars
+      integer             :: nDim, nStress
+      integer             :: uDOF, uDOFEL, mDOF, mDOFEL
+      
+      
       integer             :: lenJobName,lenOutDir
       character(len=256)  :: outDir
       character(len=256)  :: jobName
