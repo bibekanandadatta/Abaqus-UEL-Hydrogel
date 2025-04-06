@@ -1,8 +1,8 @@
 ! **********************************************************************
-! ********************** LAGRANGE ELEMENT MODULE ***********************
+! ************* LAGRANGE ELEMENT SURFACE INTEGRATION MODULE ************
 ! **********************************************************************
-!   collection of subroutines to perform element realted calculations
-!            subroutines are arranged in alphabetical order.
+!   collection of subroutines to perform surface integration on 2D QUAD4
+!        and 3D HEX8 subroutines are arranged in alphabetical order
 ! **********************************************************************
 ! **********************************************************************
 !     Author: Bibekananda Datta (C) May 2024. All Rights Reserved.
