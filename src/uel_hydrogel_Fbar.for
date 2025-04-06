@@ -5,7 +5,8 @@
 !   the formulation uses PK-II stress based total Lagrangian framework
 ! with F-bar modification for fully-integrated HEX8 and QUAD4-PE element
 ! currently supports first-order coupled elements for 3D and 2D-PE cases
-!    FUTURE TODO: add first-order elements for 2D-PS and 2D-AX cases
+!    FUTURE TODO: (a) add first-order elements for 2D-AX and 2D-PS cases
+!                 (b) add flux conditions for TET and TRI shape elements
 ! **********************************************************************
 !                     BIBEKANANDA DATTA (C) MAY 2024
 !                 JOHNS HOPKINS UNIVERSITY, BALTIMORE, MD
@@ -17,6 +18,49 @@
 !     U2                THREE-DIMENSIONAL HEX8 ELEMENT
 !     U3                PLANE STRAIN TRI3 ELEMENT
 !     U4                PLANE STRAIN QUAD4 ELEMENT
+!
+! **********************************************************************
+!
+! Surface flux boundary conditions are supported in the following
+! elements. Based on the convention, the face on which the fliud
+! flux is applied is the "label", i.e.
+! - U1,U2,U3,U4,... refer to chemical potential fluxes applied to
+!   faces 1,2,3,4,... respectively,
+! - Un1, Un2, Un3, Un4 .... refer to electrochemical potential fluxes
+!   applied to faces 1,2,3,4,... respectively, for n-th ion on the
+!
+!
+!              A eta (=xi_2)
+!  4-node      |
+!   quad       |Face 3
+!        4-----------3
+!        |     |     |
+!        |     |     |
+!  Face 4|     ------|---> xi (=xi_1)
+!        |           | Face2
+!        |           |
+!        1-----------2
+!          Face 1
+!
+!
+!  8-node     8-----------7
+!  brick     /|          /|       zeta
+!           / |         / |
+!          5-----------6  |       |     eta
+!          |  |        |  |       |   /
+!          |  |        |  |       |  /
+!          |  4--------|--3       | /
+!          | /         | /        |/
+!          |/          |/         O--------- xi
+!          1-----------2        origin at cube center
+!
+!  Convention for face numbering is as follows:
+!       Face 1 = nodes 1,2,3,4  (bottom)
+!       Face 2 = nodes 5,8,7,6  (top)
+!       Face 3 = nodes 1,5,6,2  (front)
+!       Face 4 = nodes 2,6,7,3  (right)
+!       Face 5 = nodes 3,7,8,4  (rear)
+!       Face 6 = nodes 4,8,5,1  (left)
 !
 ! **********************************************************************
 !
@@ -132,6 +176,7 @@
       include 'nonlinear_solver.for'      ! nonlinear solver module
       include 'lagrange_element.for'      ! Lagrange element module
       include 'gauss_quadrature.for'      ! Guassian quadrature module
+      include 'surface_integration.for'   ! surface integration module
       include 'solid_mechanics.for'       ! solid mechanics module
       include 'post_processing.for'       ! post-processing module
 
@@ -159,11 +204,12 @@
      & NSVARS,PROPS,NPROPS,COORDS,MCRD,NNODE,Uall,DUall,Vel,Accn,JTYPE,
      & TIME,DTIME,KSTEP,KINC,JELEM,PARAMS,NDLOAD,JDLTYP,ADLMAG,PREDEF,
      & NPREDF,LFLAGS,MLVARX,DDLMAG,MDLOAD,PNEWDT,JPROPS,NJPROPS,PERIOD,
-     & NDIM,ANALYSIS,NSTRESS,NINT,UDOF,UDOFEL,MDOF,MDOFEL)
+     & NDIM,ANALYSIS,NSTRESS,NINT,NINTS,UDOF,UDOFEL,MDOF,MDOFEL)
 
       use global_parameters
       use lagrange_element
       use gauss_quadrature
+      use surface_integration
       use linear_algebra
       use solid_mechanics
       use error_logging
@@ -186,10 +232,9 @@
       real(wp), intent(in)  :: TIME, DTIME, PARAMS, ADLMAG, PREDEF
       real(wp), intent(in)  :: DDLMAG, PERIOD
 
-      character(len=2), intent(in)    :: analysis
-      integer, intent(in)             :: nDim, nStress
+      integer, intent(in)             :: nDim, nStress, nInt, nIntS
       integer, intent(in)             :: uDOF, uDOFEL, mDOF, mDOFEL
-      integer, intent(in)             :: nInt
+      character(len=2), intent(in)    :: analysis
 
       ! output of the suboutine
       real(wp), intent(out)           :: RHS, AMATRX
@@ -263,6 +308,12 @@
       real(wp)          :: Ru(uDOFEL,1), Rm(mDOFEL,1)
       real(wp)          :: Kelem(nDOFEL,nDOFEL), Relem(nDOFEL,1)
 
+      ! variables defined to compute surface integratal and fluxes
+      integer           :: face
+      real(wp)          :: flux, dA
+      real(wp)          :: xiSurf(nIntS,nDim), wIntS(nIntS), NxiS(nNode)
+
+
       integer           :: i, j, k, l, m, n, p, q, intPt
       integer           :: nstatev
       type(element)     :: hydrogel
@@ -314,6 +365,7 @@
       dmuNode(1:mDOFEL,1)     = duAllMat(uDOF+1,1:mDOFEL)
 
       call eyeMat(ID)                       ! create an identity matrix w/ size of nDim
+
 
       ! For fully-integrated linear quad and hex elements, calculate Gmat0.
       ! These calculations are done to evaluate volumetric deformation
@@ -392,19 +444,19 @@
 
           ! form [Ba] matrix: 3D case
           if (analysis .eq. '3D') then
-            Ba(1,1)       = dNdx(i,1)
-            Ba(2,2)       = dNdx(i,2)
-            Ba(3,3)       = dNdx(i,3)
-            Ba(4,1:nDim)  = [  zero,      dNdx(i,3),  dNdx(i,2)]
-            Ba(5,1:nDim)  = [dNdx(i,3),     zero,     dNdx(i,1)]
-            Ba(6,1:nDim)  = [dNdx(i,2),   dNdx(i,1),    zero   ]
+            Ba(1,1)       = dNdX(i,1)
+            Ba(2,2)       = dNdX(i,2)
+            Ba(3,3)       = dNdX(i,3)
+            Ba(4,1:nDim)  = [  zero,      dNdX(i,3),  dNdX(i,2)]
+            Ba(5,1:nDim)  = [dNdX(i,3),     zero,     dNdX(i,1)]
+            Ba(6,1:nDim)  = [dNdX(i,2),   dNdX(i,1),    zero   ]
 
           ! form [Ba] matrix: plane stress/ plane strain case
           else if (analysis .eq. 'PE') then
-            Ba(1,1)       = dNdx(i,1)
-            Ba(2,2)       = dNdx(i,2)
-            Ba(3,1:nDim)  = [dNdx(i,2), dNdx(i,1)]
-          else 
+            Ba(1,1)       = dNdX(i,1)
+            Ba(2,2)       = dNdX(i,2)
+            Ba(3,1:nDim)  = [dNdX(i,2), dNdX(i,1)]
+          else
             call msg%ferror( flag=error, src='uelHydrogel',
      &                msg='Wrong analysis.', ch=analysis )
             call xit
@@ -578,12 +630,12 @@
                       do p = 1,nDim
                         do q = 1,nDim
                           QR0Tensor(i,j,k,l) = QR0Tensor(i,j,k,l)
-     &                        + half * Fbar(i,p) * Cmat(p,j,q,n)
-     &                        * Fbar(m,q) * Fbar(m,n) * F0InvT(k,l)
+     &                        + half * Fbar(i,p) * Cmat(p,j,m,n)
+     &                        * Fbar(q,m) * Fbar(q,n) * F0InvT(k,l)
 
                           QRTensor(i,j,k,l) = QRTensor(i,j,k,l)
-     &                        + half * Fbar(i,p) * Cmat(p,j,q,n)
-     &                        * Fbar(m,q) * Fbar(m,n) * FInvT(k,l)
+     &                        + half * Fbar(i,p) * Cmat(p,j,m,n)
+     &                        * Fbar(q,m) * Fbar(q,n) * FInvT(k,l)
                         end do
                       end do
                     end do
@@ -631,7 +683,7 @@
      &            + matmul( matmul(dNdX, MmatW), transpose(dNdX) )
      &            )
 
-        ! mechanical residual (TODO: add body force)
+        ! mechanical residual
         Ru = Ru - w(intPt) * detJ * resFac *
      &            matmul( transpose(BNLmat), stressPK2 )
 
@@ -642,8 +694,60 @@
       end do                           ! end of integration point loop
 
 
-      ! apply traction boundary condition on the overlaying mechanical elements
-      ! TODO: add code snippet to calculate the flux for the solvent (modify Rm)
+      !!!!!!!!!!!!!!!!!!!! FLUX BOUNDARY CONDITION !!!!!!!!!!!!!!!!!!!!
+
+      ! THIS PART OF THE CODE HAS NOT BEEN COMPLETELY TESTED YET
+      ! the code development follows Chester et al. (IJSS, 2015) for
+      ! HEX8 and QUAD4 elements are available and can be extended
+      ! apply traction/ pressure using the overlaying mechanical elements
+
+      if (ndload .gt. 0) then
+
+        ! loop over all the applied surface fluxes
+        do i = 1, ndload
+
+          face    = jdltyp(i,1)
+          flux    = adlmag(i,1)
+
+          if (jtype .eq. 2) then        ! check flux faces for HEX8 element
+            if( (face .lt. 1) .and. (face .gt. 6) ) then
+              call msg%ferror( flag=error, src='uel_pe_hydrogel',
+     &             msg='Flux applied to unknown face: ', ia=face )
+              call xit
+            end if
+
+          elseif (jtype  .eq.  4) then    ! check flux faces for QUAD4 element
+            if( (face .lt. 1) .and. (face .gt. 4) ) then
+              call msg%ferror( flag=error, src='uel_pe_hydrogel',
+     &             msg='Flux applied to unknown face: ', ia=face )
+              call xit
+            endif
+
+          else                            ! flux BC not available for other element types
+            call msg%ferror( flag=error, src='uel_pe_hydrogel',
+     &               msg='Flux BC not available for element.', ia=jtype )
+            call xit
+          end if
+
+          ! get the surface integration points and weights
+          call getSurfGaussQuadrtr(face,wIntS,xiSurf)
+
+            ! loop over the surface integration points
+            do intPt = 1, nIntS
+
+              ! compute the surface area for 3D element
+              call computeSurfArea(xiSurf(intPt,:),face,coords,NxiS,dA)
+
+                Rm  = Rm
+     &              - wIntS(intPt)*dA*reshape(NxiS,[nNode,1])*flux
+            end do
+
+        end do
+        ! end the loop over the flux forces (ndload)
+
+      end if
+
+      !!!!!!!!!!!!!!!!!! END FLUX BOUNDARY CONDITION !!!!!!!!!!!!!!!!!!
 
 
       ! assemble the element tangent sub-matrices and residual sub-vectors
@@ -922,17 +1026,17 @@
       else if (matID .eq. 2) then          ! Arruda-Boyce elastomeric gel
         lam_c     = sqrt(trC/three)
         lam_r     = lam_c/lam_L
-        beta_0    = InvLangevin( (phi0**third)/ lam_L) 
+        beta_0    = InvLangevin( (phi0**third)/ lam_L)
         beta_c    = InvLangevin(lam_r)
         dBeta_c   = DInvLangevin(lam_r)
 
         ! (5.1) stress tensors
         stressTensorCauchy  = (1/detF) * ( (Gshear/three)*lam_r*beta_c*B
-     &        - ( (Gshear*lam_L)/three * beta_0 * (phi0)**(two/three) 
+     &        - ( (Gshear*lam_L)/three * beta_0 * (phi0)**(two/three)
      &        - Kappa*phi0*detFs*log(detFe) ) * ID3 )
 
         stressTensorPK2     = (Gshear/three) * lam_r * beta_c * ID3
-     &        - ( ( (phi0)**(two/three) *Gshear*lam_L )/three 
+     &        - ( ( (phi0)**(two/three) *Gshear*lam_L )/three
      &        - Kappa*phi0*detFs*log(detFe) ) * Cinv
 
         ! (5.2) calculate material tangent
@@ -944,7 +1048,7 @@
      &              + Gshear/(nine*lam_c**two)
      &              * ( dBeta_c- lam_r*beta_c ) * ID3(i,j)*ID3(k,l)
      &              + Kappa * phi0 * detFs * Cinv(i,j)*Cinv(k,l)
-     &              + ( (Gshear/three) * lam_L 
+     &              + ( (Gshear/three) * lam_L
      &              - Kappa * phi0 * detFs * log(detFe) )
      &              * ( Cinv(i,k)*Cinv(j,l) + Cinv(i,l)*Cinv(j,k) )
      &              + two * dSdCwTensor(i,j) * dCwdCTensor(k,l)
@@ -982,7 +1086,7 @@
           do l = 1,nDim
             do j = 1,nDim               ! summation over dummy index j
               JwTensor(i,k,l) = JwTensor(i,k,l)
-     &            + (Dw*Cw_new)/RT 
+     &            + (Dw*Cw_new)/RT
      &            * ( FInv(i,k)*CInv(l,j) ) * dMUdX(j,1)
      &            - (Dw/RT) * CInv(i,j) * dMUdX(j,1) * dCwdFTensor(k,l)
             end do
@@ -1073,7 +1177,7 @@
 
       else if ((abs(x) .ge. 0.84136_wp) .and. (abs(x) .lt. one)) then
         InvLangevin = one/(sign(one,x)-x)
-        
+
       else
         call msg%ferror(flag=error, src='umatArrudaBoyce:InvLangevin',
      &                  msg='Unbound argument.', ra = x)
@@ -1271,11 +1375,11 @@
       character(len=2)    :: analysis
       character(len=8)    :: abqProcedure
       logical             :: nlgeom
-      integer             :: nInt, nPostVars
       integer             :: nDim, nStress
+      integer             :: nInt, nInts, nPostVars
       integer             :: uDOF, uDOFEL, mDOF, mDOFEL
-      
-      
+
+
       integer             :: lenJobName,lenOutDir
       character(len=256)  :: outDir
       character(len=256)  :: jobName
@@ -1337,6 +1441,15 @@
         call xit
       end if
 
+
+      ! no of surface integration points for calculating flux
+      if (jtype .eq. 2) then
+        nIntS = 4
+      else if (jtype .eq. 4) then
+        nIntS = 2
+      end if
+
+
       uDOF   = nDim
       uDOFEl = uDOF*nNode
       mDOF   = 1
@@ -1376,12 +1489,13 @@
       ! return when Abaqus performs dummy step calculation with dt = 0
       if( dtime .eq. zero) return
 
-      
+
       call uel_hydrogel(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
      &    PROPS,NPROPS,COORDS,MCRD,NNODE,Uall,DUall,Vel,Accn,JTYPE,TIME,
      &    DTIME,KSTEP,KINC,JELEM,PARAMS,NDLOAD,JDLTYP,ADLMAG,PREDEF,
      &    NPREDF,LFLAGS,MLVARX,DDLMAG,MDLOAD,PNEWDT,JPROPS,NJPROPS,
-     &    PERIOD,NDIM,ANALYSIS,NSTRESS,NINT,UDOF,UDOFEL,MDOF,MDOFEL)
+     &    PERIOD,NDIM,ANALYSIS,NSTRESS,NINT,NINTS,UDOF,UDOFEL,
+     &    MDOF,MDOFEL)
 
       END SUBROUTINE UEL
 
