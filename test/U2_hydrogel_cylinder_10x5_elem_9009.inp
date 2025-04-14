@@ -3,6 +3,47 @@
 ** the dimension of the cylinder is 10 mm (height) x 5 mm (diameter) 
 ** an octant of the 3D cylinder is modeled using U2 (HEX8) element
 ** It starts from the dry state to a swollen equilibrium state
+************************************************************************
+** PARAMETERS (SI UNIT SYSTEM)
+************************************************************************
+*Parameter
+** geometric parameters
+nDim        = 3
+nStress     = 6
+nnode       = 8
+nInt        = 8
+fbar        = 1
+matID       = 1
+matProps    = 12
+intProps    = 4
+nstatev     = 1
+nsvars      = nstatev*nInt
+nPostVars   = 2*nStress + nstatev
+** physical constants and material properties
+Rgas    = 8.3145
+theta   = 25.0 + 273.0
+phi0    = 0.999
+rho     = 1100.0
+Gshear  = 100.0e3
+kappa   = 50.0*Gshear
+lam_L   = 0.
+Vp      = 8.928e-3
+mu0     = 0.0
+Vw      = 1.8e-5
+chi     = 0.485
+Dw      = 1.7e-6
+RT      = Rgas*theta
+** initial condition
+initMU  = mu0 + RT*(phi0+log(1-phi0)+chi*phi0**2) - kappa*Vw*log(phi0) + 0.5*kappa*Vw*(log(phi0))**2
+** physical constants and material properties
+tRamp   = 3600.0*3.0
+tEnd    = 3600.0*24.0
+dtInit  = 10.0
+dtMax   = 500.0
+dtMin   = 1.0e-6
+************************************************************************
+** GEOMETRY and MESH
+************************************************************************
 *Node
 1, 0.00191176473,           0.,           0.
 2,           0.,           0.,           0.
@@ -10340,7 +10381,7 @@
 10334, 0.00198939093, 0.00257575768, -0.000385481399
 10335, 0.00201465981, 0.00257575768, -0.000257343025
 10336, 0.00203746045, 0.00257575768, -0.000128840577
-*User Element,Type=U2,Nodes=8,Coordinates=3,Properties=12,Iproperties=3,Variables=8,Unsymm
+*User Element,Type=U2,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm
 1,2,3,11
 *Element, type=U2
 1,   133,  1130,  3641,   770,     1,    22,   482,    69
@@ -28727,39 +28768,6 @@
 999996,999997,999998,999999
 *Elset,elset=extraElement
 999999
-************************************************************************
-** PARAMETERS (SI UNIT SYSTEM)
-************************************************************************
-*Parameter
-** geometric parameters
-nDim    = 3
-nStress = 6
-** element properties and material ID
-nInt        = 8
-matID       = 1
-nPostVars   = 2*nStress + 1
-** physical constants and material properties
-Rgas    = 8.3145
-theta   = 25.0 + 273.0
-phi0    = 0.999
-rho     = 1100.0
-Gshear  = 100.0e3
-kappa   = 50.0*Gshear
-lam_L   = 0.
-Vp      = 8.928e-3
-mu0     = 0.0
-Vw      = 1.8e-5
-chi     = 0.485
-Dw      = 1.7e-6
-RT      = Rgas*theta
-** initial condition
-initMU  = mu0 + RT*(phi0+log(1-phi0)+chi*phi0**2) - kappa*Vw*log(phi0) + 0.5*kappa*Vw*(log(phi0))**2
-** physical constants and material properties
-tRamp   = 3600.0*3.0
-tEnd    = 3600.0*24.0
-dtInit  = 10.0
-dtMax   = 500.0
-dtMin   = 1.0e-6
 *************************************************************************** 
 ** MATERIAL DEFINITION 
 ***************************************************************************
@@ -28767,8 +28775,8 @@ dtMin   = 1.0e-6
 *uel property,elset=all
 ** Rgas theta phi0 rho Gshear kappa lam_L Vp 
 <Rgas>, <theta>, <phi0>, <rho>, <Gshear>, <kappa>, <lam_L>, <Vp>, 
-** mu0 Vw chi Dw nInt matID nPostVars
-<mu0>, <Vw>, <chi>, <Dw>, <nInt>, <matID>, <nPostVars>
+** mu0 Vw chi Dw nInt fbar matID nPostVars
+<mu0>, <Vw>, <chi>, <Dw>, <nInt>, <fbar>, <matID>, <nPostVars>
 ***************************************************************************
 *Solid section, elset=ElDummy, material=DummyMaterial 
 *Material, name=DummyMaterial
