@@ -5,8 +5,7 @@
 !   the formulation uses PK-II stress based total Lagrangian framework
 ! with F-bar modification for fully-integrated HEX8 and QUAD4-PE element
 ! currently supports first-order coupled elements for 3D and 2D-PE cases
-!    FUTURE TODO: (a) add first-order elements for 2D-AX and 2D-PS cases
-!                 (b) add flux conditions for TET and TRI shape elements
+!    FUTURE TODO: add first-order elements for 2D-PS and 2D-AX cases
 ! **********************************************************************
 !                     BIBEKANANDA DATTA (C) MAY 2024
 !                 JOHNS HOPKINS UNIVERSITY, BALTIMORE, MD
@@ -18,49 +17,6 @@
 !     U2                THREE-DIMENSIONAL HEX8 ELEMENT
 !     U3                PLANE STRAIN TRI3 ELEMENT
 !     U4                PLANE STRAIN QUAD4 ELEMENT
-!
-! **********************************************************************
-!
-! Surface flux boundary conditions are supported in the following
-! elements. Based on the convention, the face on which the fliud
-! flux is applied is the "label", i.e.
-! - U1,U2,U3,U4,... refer to chemical potential fluxes applied to
-!   faces 1,2,3,4,... respectively,
-! - Un1, Un2, Un3, Un4 .... refer to electrochemical potential fluxes
-!   applied to faces 1,2,3,4,... respectively, for n-th ion on the
-!
-!
-!              A eta (=xi_2)
-!  4-node      |
-!   quad       |Face 3
-!        4-----------3
-!        |     |     |
-!        |     |     |
-!  Face 4|     ------|---> xi (=xi_1)
-!        |           | Face2
-!        |           |
-!        1-----------2
-!          Face 1
-!
-!
-!  8-node     8-----------7
-!  brick     /|          /|       zeta
-!           / |         / |
-!          5-----------6  |       |     eta
-!          |  |        |  |       |   /
-!          |  |        |  |       |  /
-!          |  4--------|--3       | /
-!          | /         | /        |/
-!          |/          |/         O--------- xi
-!          1-----------2        origin at cube center
-!
-!  Convention for face numbering is as follows:
-!       Face 1 = nodes 1,2,3,4  (bottom)
-!       Face 2 = nodes 5,8,7,6  (top)
-!       Face 3 = nodes 1,5,6,2  (front)
-!       Face 4 = nodes 2,6,7,3  (right)
-!       Face 5 = nodes 3,7,8,4  (rear)
-!       Face 6 = nodes 4,8,5,1  (left)
 !
 ! **********************************************************************
 !
@@ -97,8 +53,9 @@
 !                        LIST OF ELEMENT PROPERTIES
 !
 !     jprops(1)   = nInt            no of integration points in element
-!     jprops(2)   = matID           constitutive model for elastomeric network
-!     jprops(3)   = nPostVars       no of local (int pt) post-processing variables
+!     jprops(2)   = fbarFlag        flag to use F-bar modification or not
+!     jprops(3)   = matID           constitutive model for elastomeric network
+!     jprops(4)   = nPostVars       no of local (int pt) post-processing variables
 !
 ! **********************************************************************
 !
@@ -170,15 +127,15 @@
 ! **********************************************************************
 
       ! make sure the relative directory is correct
-      include 'global_parameters.for'     ! global parameters module
-      include 'error_logging.for'         ! error/ debugging module
-      include 'linear_algebra.for'        ! linear algebra module
-      include 'nonlinear_solver.for'      ! nonlinear solver module
-      include 'lagrange_element.for'      ! Lagrange element module
-      include 'gauss_quadrature.for'      ! Guassian quadrature module
-      include 'surface_integration.for'   ! surface integration module
-      include 'solid_mechanics.for'       ! solid mechanics module
-      include 'post_processing.for'       ! post-processing module
+      include '../module/global_parameters.for'     ! global parameters module
+      include '../module/error_logging.for'         ! error/ debugging module
+      include '../module/linear_algebra.for'        ! linear algebra module
+      include '../module/nonlinear_solver.for'      ! nonlinear solver module
+      include '../module/lagrange_element.for'      ! Lagrange element module
+      include '../module/gauss_quadrature.for'      ! Guassian quadrature module
+      include '../module/surface_integration.for'   ! surface integration module
+      include '../module/solid_mechanics.for'       ! solid mechanics module
+      include '../module/post_processing.for'       ! post-processing module
 
 ! **********************************************************************
 ! **********************************************************************
@@ -204,15 +161,15 @@
      & NSVARS,PROPS,NPROPS,COORDS,MCRD,NNODE,Uall,DUall,Vel,Accn,JTYPE,
      & TIME,DTIME,KSTEP,KINC,JELEM,PARAMS,NDLOAD,JDLTYP,ADLMAG,PREDEF,
      & NPREDF,LFLAGS,MLVARX,DDLMAG,MDLOAD,PNEWDT,JPROPS,NJPROPS,PERIOD,
-     & NDIM,ANALYSIS,NSTRESS,NINT,NINTS,UDOF,UDOFEL,MDOF,MDOFEL)
+     & NDIM,ANALYSIS,NSTRESS,NINT,UDOF,UDOFEL,MDOF,MDOFEL)
 
       use global_parameters
+      use error_logging
       use lagrange_element
       use gauss_quadrature
       use surface_integration
-      use linear_algebra
       use solid_mechanics
-      use error_logging
+      use linear_algebra
 
       implicit none
 
@@ -232,11 +189,10 @@
       real(wp), intent(in)  :: TIME, DTIME, PARAMS, ADLMAG, PREDEF
       real(wp), intent(in)  :: DDLMAG, PERIOD
 
-
-      integer, intent(in)             :: nDim, nStress, nInt, nIntS
-      integer, intent(in)             :: uDOF, uDOFEL, mDOF, mDOFEL
       character(len=2), intent(in)    :: analysis
-
+      integer, intent(in)             :: nDim, nStress
+      integer, intent(in)             :: uDOF, uDOFEL, mDOF, mDOFEL
+      integer, intent(in)             :: nInt
 
       ! output of the suboutine
       real(wp), intent(out)           :: RHS, AMATRX
@@ -245,62 +201,98 @@
       ! variables local to the subroutine
       real(wp)          :: ID(nDim,nDim)
 
-      ! nodal degrees of freedom in the matrix form
+      ! nodal degrees of freedom
       real(wp)          :: UallMat(uDOF+mDOF,nNode)
       real(wp)          :: DUallMat(uDOF+mDOF,nNODE)
       real(wp)          :: uNode(nDim,nNode), muNode(mDOFEL,1)
       real(wp)          :: duNode(nDim,nNode), dmuNode(mDOFEL,1)
 
-      ! finite element matrices and parameters
+      ! additional field variables at the nodes and integration point
+      real(wp)          :: fieldNode(npredf,nNode)
+      real(wp)          :: dfieldNode(npredf,nNode)
+
+
+      ! finite element parameters (integration and shape functions)
       real(wp)          :: w(nInt), xi(nInt,nDim)
       real(wp)          :: Nxi(nNode), dNdxi(nNode,nDim)
       real(wp)          :: dXdxi(nDim,nDim), dxidX(nDim,nDim)
       real(wp)          :: detJ, dNdX(nNode,nDim)
 
-      ! finite element operator matrices
-      real(wp)          :: Na(nDim,nDim), Nmat(nDim,uDOFEl)
+      ! finite element matrix operators
+      real(wp)          :: Na(nDim,nDim)
+      real(wp)          :: Ba(nStress,nDim)
       real(wp)          :: Ga(nDim*nDim,nDim)
+      real(wp)          :: Nmat(nDim,uDOFEl)
+      real(wp)          :: NmatT(uDOFEL,nDim)
+      real(wp)          :: Bmat(nStress,uDOFEl)
+      real(wp)          :: BmatT(uDOFEL,nStress)
       real(wp)          :: Gmat(nDim*nDim,nDim*nNode)
-      real(wp)          :: Ba(nStress,nDim), Bmat(nStress,uDOFEl)
-      real(wp)          :: BNLmat(nStress,nDim*nNode)
+      real(wp)          :: GmatT(nDim*nNode,nDim*nDim)
+      real(wp)          :: NmatScalar(1,nNode)
+      real(wp)          :: NmatScalarT(nNode,1)
+      real(wp)          :: BmatScalar(nDim,nNode)
+      real(wp)          :: BmatScalarT(nNode,nDim)
+
+      ! additional matrix operator for element formulation
       real(wp)          :: stressTensorPK2(nDim,nDim)
       real(wp)          :: SIGMA_S(nDim*nDim,nDim*nDim)
       real(wp)          :: SIGMA_F(nDim*nNode,nDim*nNode)
+      real(wp)          :: BNLmat(nStress,nDim*nNode)
+      real(wp)          :: BNLmatT(nDim*nNode,nStress)
+
+
+      ! additional variables for F-bar method (element and material)
+      logical           :: fbarFlag
+      real(wp)          :: centroid(nDim)
+      real(wp)          :: Nxi0(nNode), dNdxi0(nNode,nDim)
+      real(wp)          :: dXdxi0(nDim,nDim), dxidX0(nDim,nDim)
+      real(wp)          :: dNdX0(nNode,nDim), detJ0
+      real(wp)          :: Ga0(nDim*nDim,nDim)
+      real(wp)          :: Gmat0(nDim*nDim,uDOFEl)
+      real(wp)          :: F0(3,3), detF0
+      real(wp)          :: F0Inv(3,3), F0InvT(3,3)
+      real(wp)          :: QR0Tensor(nDim,nDim,nDim,nDim)
+      real(wp)          :: QRTensor(nDim,nDim,nDim,nDim)
+      real(wp)          :: QR0mat(nDim*nDim,nDim*nDim)
+      real(wp)          :: QRmat(nDim*nDim,nDim*nDim)
+      real(wp)          :: tanFac1, tanFac2, resFac
+      
 
       ! integration point quantities (variables)
       real(wp)          :: coord_ip(nDim,1)
       real(wp)          :: F(3,3), detF, Fbar(3,3)
       real(wp)          :: FInv(3,3), FInvT(3,3)
       real(wp)          :: mu, dMUdX(nDim,1)
-
-      ! additional field variables at the nodes and integration point
-      real(wp)          :: fieldNode(npredf,nNode)
-      real(wp)          :: dfieldNode(npredf,nNode)
       real(wp)          :: fieldVar(npredf), dfieldVar(npredf)
 
-      ! element and material properties used in this subroutine
-      real(wp), allocatable :: statev(:)  ! state variables per int pt
+      
+      ! material model identifier and state variables
       integer               :: matID      ! material constitutive law
+      real(wp), allocatable :: statev(:)  ! state variables per int pt
 
-      ! output from the material point subroutine (UMAT)
+
+      ! constitutive output from the material point subroutine (UMAT)
       real(wp)          :: stressPK2(nStress,1)
-      real(wp)          :: Dmat(nStress,nStress), Cmat(3,3,3,3)
-      real(wp)          :: dCwdt
-      real(wp)          :: Jw(nDim,1), dCwdotdmu, dJwdMu(nDim,1)
-      real(wp)          :: dVectUM(nDim*nDim,1), DmatMU(nDim,nDim*nDim)
-      real(wp)          :: MmatW(nDim,nDim), dCwdotdF(1,nDim*nDim)
+      real(wp)          :: dCwdt, Jw(nDim,1)
+      real(wp)          :: Dmat(nStress,nStress)
+      real(wp)          :: Cmat(3,3,3,3)
+      real(wp)          :: aVectUM(nDim*nDim,1)
+      real(wp)          :: dCwdotdF(1,nDim*nDim)
+      real(wp)          :: DmatMU(nDim,nDim*nDim)
+      real(wp)          :: dCwdotdmu, dJwdMu(nDim,1)
+      real(wp)          :: MmatW(nDim,nDim)
 
-      ! tangent matrix components and residual vectors
-      real(wp)          :: Kuu(uDOFEl,uDOFEl), Kum(uDOFEl,mDOFEL)
-      real(wp)          :: Kmu(mDOFEL,uDOFEl), Kmm(mDOFEL,mDOFEL)
-      real(wp)          :: Ru(uDOFEL,1), Rm(mDOFEL,1)
-      real(wp)          :: Kelem(nDOFEL,nDOFEL), Relem(nDOFEL,1)
+      ! element residual vectors and tangent matrix components
+      real(wp)          :: Ru(uDOFEL,1)
+      real(wp)          :: Rm(mDOFEL,1)
 
-      ! variables defined to compute surface integratal and fluxes
-      integer           :: face
-      real(wp)          :: flux, dA
-      real(wp)          :: xiSurf(nInts,nDim), wIntS(nIntS), NxiS(nNode)
+      real(wp)          :: Kuu(uDOFEl,uDOFEl)
+      real(wp)          :: Kum(uDOFEl,mDOFEL)
+      real(wp)          :: Kmu(mDOFEL,uDOFEl)
+      real(wp)          :: Kmm(mDOFEL,mDOFEL)
 
+      real(wp)          :: Kelem(nDOFEL,nDOFEL)
+      real(wp)          :: Relem(nDOFEL,1)
 
       integer           :: i, j, k, l, m, n, p, q, intPt
       integer           :: nstatev
@@ -313,6 +305,10 @@
 
 
       ! N_mu = transpose(Nxi), B_mu = transpose(dNdX) in the theory
+      F0      = zero
+      Fbar    = zero
+      Ga0     = zero
+      Gmat0   = zero
       F       = zero
       Na      = zero
       Ba      = zero
@@ -331,10 +327,17 @@
       Kelem   = zero
       Relem   = zero
 
-      matID     = jprops(2)
+      matID     = jprops(3)
       nstatev   = nsvars/nint       ! state variables per integration point
 
-      if ( .not. allocated(statev) ) allocate(statev(nstatev))
+      ! set the F-bar flag based on the input
+      if (jprops(2) .eq. 0) then
+        fbarFlag = .false.
+      else 
+        fbarFlag = .true.
+      end if
+
+      if ( .not. allocated(statev) ) allocate(statev(nstatev) )
 
       ! reshape the degrees of freedom and their change into matrices
       uAllMat   = reshape( uAll, shape=[uDOF+mDOF,nNode] )
@@ -348,8 +351,65 @@
       duNode(1:uDOF,1:nNode)  = duAllMat(1:uDOF,1:nNode)
       dmuNode(1:mDOFEL,1)     = duAllMat(uDOF+1,1:mDOFEL)
 
+
+
       call eyeMat(ID)                       ! create an identity matrix w/ size of nDim
 
+
+      ! For fully-integrated QUAD4 and HEX8 element, calculate Gmat0.
+      ! These calculations are done to evaluate volumetric deformation
+      ! gradient at the element centroid to calculate F-bar.
+      if (fbarFlag .eq. .true.) then
+
+        if ( ((jtype .eq. 2) .and. (nInt .eq. 8))
+     &      .or. ((jtype .eq. 4) .and. (nInt .eq. 4)) ) then
+
+          centroid = zero
+
+          ! evaluate the interpolation functions and derivates at centroid
+          call calcInterpFunc(hydrogel, centroid, Nxi0, dNdxi0)
+
+          ! calculate element jacobian and global shape func gradient at centroid
+          dXdxi0  = matmul(coords,dNdxi0)       ! calculate the jacobian (dXdxi) at centroid
+          detJ0   = det(dXdxi0)                 ! calculate jacobian determinant at centroid
+
+          if (detJ0 .le. zero) then
+            call msg%ferror( flag=warn, src='uel_hydrogel',
+     &      msg='Negative element jacobian at centroid: ', ia=jelem)
+          call xit
+          end if
+
+          dxidX0 = inv(dXdxi0)                  ! calculate jacobian inverse
+          dNdX0  = matmul(dNdxi0,dxidX0)        ! calculate dNdX at centroid
+
+          do i=1,nNode
+
+            ! form the nodal-level matrix: [Ga0] at the centroid
+            do j = 1, nDim
+              Ga0(nDim*(j-1)+1:nDim*j, 1:nDim) = dNdX0(i,j)*ID
+            end do
+
+            ! form the [G0] matrix at the centroid
+            Gmat0(1:nDim**2,nDim*(i-1)+1:nDim*i) = Ga0(1:nDim**2,1:nDim)
+          end do                             ! end of nodal point loop
+
+          
+          F0(1:nDim,1:nDim) = ID + matmul(uNode,dNdX0)
+
+          if (analysis .eq. 'PE') F0(3,3) = one
+
+          detF0   = det(F0)
+          F0Inv   = inv(F0)
+          F0InvT  = transpose(F0Inv)
+
+        else 
+          call msg%ferror( flag=warn, src='uel_hydrogel',
+     &      msg='F-bar is not available: ', ivec=[jtype, nInt])
+          call xit
+        end if
+
+      end if
+      ! end of centroid level calculation for F-bar
 
       ! obtain the standard gauss quadrature points and weights
       call getGaussQuadrtr(hydrogel,w,xi)
@@ -364,8 +424,8 @@
         detJ  = det(dxdxi)                  ! calculate determinant
 
         if (detJ .lt. zero) then
-          call msg%ferror( flag=warn, src='uelHydrogel',
-     &          msg='Negative element jacobian.', ivec=[jelem, intpt])
+          call msg%ferror( flag=warn, src='uel_hydrogel',
+     &          msg='Negative element jacobian: ', ivec=[jelem, intpt])
         end if
 
         dxidX = inv(dxdxi)                  ! calculate inverse
@@ -383,21 +443,21 @@
 
           ! form [Ba] matrix: 3D case
           if (analysis .eq. '3D') then
-            Ba(1,1)       = dNdX(i,1)
-            Ba(2,2)       = dNdX(i,2)
-            Ba(3,3)       = dNdX(i,3)
-            Ba(4,1:nDim)  = [  zero,      dNdX(i,3),  dNdX(i,2)]
-            Ba(5,1:nDim)  = [dNdX(i,3),     zero,     dNdX(i,1)]
-            Ba(6,1:nDim)  = [dNdX(i,2),   dNdX(i,1),    zero   ]
+            Ba(1,1)       = dNdx(i,1)
+            Ba(2,2)       = dNdx(i,2)
+            Ba(3,3)       = dNdx(i,3)
+            Ba(4,1:nDim)  = [  zero,      dNdx(i,3),  dNdx(i,2)]
+            Ba(5,1:nDim)  = [dNdx(i,3),     zero,     dNdx(i,1)]
+            Ba(6,1:nDim)  = [dNdx(i,2),   dNdx(i,1),    zero   ]
 
           ! form [Ba] matrix: plane stress/ plane strain case
           else if (analysis .eq. 'PE') then
-            Ba(1,1)       = dNdX(i,1)
-            Ba(2,2)       = dNdX(i,2)
-            Ba(3,1:nDim)  = [dNdX(i,2), dNdX(i,1)]
-          else
-            call msg%ferror( flag=error, src='uelHydrogel',
-     &                msg='Wrong analysis.', ch=analysis )
+            Ba(1,1)       = dNdx(i,1)
+            Ba(2,2)       = dNdx(i,2)
+            Ba(3,1:nDim)  = [dNdx(i,2), dNdx(i,1)]
+          else 
+            call msg%ferror( flag=error, src='uel_hydrogel',
+     &                msg='Wrong analysis: ', ch=analysis )
             call xit
           end if
 
@@ -407,40 +467,92 @@
           Gmat(1:nDim**2,nDim*(i-1)+1:nDim*i) = Ga(1:nDim**2,1:nDim)
         end do                             ! end of nodal point loop
 
-      !!!!!!!!!!!!!! COMPLETE ELEMENT RELATED OPERATIONS !!!!!!!!!!!!!!!
+
+        ! transpose the vector field matrix operators
+        NmatT       = transpose(Nmat)
+        BmatT       = transpose(Bmat)
+        GmatT       = transpose(Gmat)
+
+        ! all the scalar matrix operators for the element
+        NmatScalar  = reshape(Nxi, [1, nNode])
+        NmatScalarT = transpose(NmatScalar)
+        BmatScalar  = transpose(dNdX)
+        BmatScalarT = dNdX
+
+        !!!!!!!!!!!!! END CALCULATING ELEMENT OPERATORS !!!!!!!!!!!!!!!
 
 
 
-      !!!!!!!!!!!!!!!!!!!!!!! CONSTITUTIVE MODEL !!!!!!!!!!!!!!!!!!!!!!!
+        !!!!!!!!!!!!!!!!!! CONSTITUTIVE CALCULATION !!!!!!!!!!!!!!!!!!!
 
         ! calculate the coordinate of integration point
         coord_ip = matmul(Nmat, reshape(coords, [nDOFEL, 1]))
 
 
         ! calculate deformation gradient and deformation tensors
-        F(1:nDim,1:nDim) = ID + matmul(uNode,dNdX)
+        F(1:nDim,1:nDim)  = ID + matmul(uNode,dNdX)
 
         if (analysis .eq. 'PE')  F(3,3) = one
+
+        ! calculate jacobian (volume change) at the current integration pt
+        detF    = det(F)
+        FInv    = inv(F)
+        FInvT   = transpose(FInv)
 
         ! calculate chemical potential and its gradient
         mu    = dot_product( Nxi, reshape(muNode, [mDOFEl]) )
 
-        dMUdX = matmul(transpose(dNdX), muNode)
+        dMudX = matmul( BmatScalar, muNode )
+
+        !! definition of modified deformation gradient, F-bar
+        if (fbarFlag .eq. .true.) then
+          if ( (jtype .eq. 2) .and. (nInt .eq. 8) ) then
+            ! fully-integrated HEX8 element
+            Fbar    = (detF0/detF)**(third) * F
+            resFac  = (detF0/detF)**(-two/three)
+            tanFac1 = (detF0/detF)**(-one/three)
+            tanFac2 = (detF0/detF)**(-two/three)
+
+          else if ( (jtype .eq. 4) .and. (nInt .eq. 4) )  then
+            ! fully-integrated QUAD4-PE element
+            Fbar(3,3)           = one
+            Fbar(1:nDim,1:nDim) = (detF0/detF)**(half)*F(1:nDim,1:nDim)
+            resFac              = (detF0/detF)**(-half)
+            tanFac1             = one
+            tanFac2             = (detF0/detF)**(-half)
+          else
+            ! standard F for all other available elements
+            Fbar    = F
+            resFac  = one
+            tanFac1 = one
+            tanFac2 = one
+            call msg%ferror( flag=warn, src='uel_hydrogel',
+     &      msg='F-bar is not available: ', ivec=[jtype, nInt])
+          call xit
+          end if
+        else
+          ! set F-bar = F if fbarFlag is .false. for all element
+          Fbar    = F
+          resFac  = one
+          tanFac1 = one
+          tanFac2 = one
+        end if
 
 
         ! call material point subroutine (UMAT) for the neutral gel
         call umat_hydrogel(kstep,kinc,time,dtime,nDim,analysis,
      &          nStress,nNode,jelem,intpt,coord_ip,props,nprops,
-     &          jprops,njprops,matID,F,mu,dMudX,
+     &          jprops,njprops,matID,Fbar,mu,dMudX,
      &          svars,nsvars,fieldVar,dfieldVar,npredf,
-     &          stressPK2,Jw,dCwdt,
-     &          Dmat,Cmat,dVectUM,dCwdotdF,DmatMU,dCwdotdMu,dJwdMu,
+     &          stressPK2,dCwdt,Jw,
+     &          Dmat,Cmat,aVectUM,dCwdotdF,DmatMU,dCwdotdMu,dJwdMu,
      &          MmatW)
 
-      !!!!!!!!!!!!!!!!!!!! END CONSTITUTIVE MODEL !!!!!!!!!!!!!!!!!!!!!!
+       !!!!!!!!!!!!!!! END CONSTITUTIVE CALCULATION !!!!!!!!!!!!!!!!!!
 
 
-      !!!!!!!!!!!!! TANGENT MATRIX AND RESIDUAL VECTOR !!!!!!!!!!!!!!!!!
+
+        !!!!!!!!!!!!! FORM ADDITIONAL ELEMENT OPERATORS !!!!!!!!!!!!!!!
 
         call voigtVectorScatter(stressPK2,stressTensorPK2)
 
@@ -449,7 +561,7 @@
           do j = 1, nNode
             if (i .eq. j) then
               SIGMA_F(nDim*(i-1)+1:nDim*i,nDim*(j-1)+1:nDim*j)
-     &                           = F(1:nDim,1:nDim)
+     &                           = Fbar(1:nDim,1:nDim)
             end if
           end do
         end do
@@ -462,110 +574,149 @@
           end do
         end do
 
-        BNLmat = matmul(Bmat,SIGMA_F)
+        BNLmat  = matmul(Bmat,SIGMA_F)
+        BNLmatT = transpose(BNLmat)
+
+        !!!!!!!!!! END FORMING ADDITIONAL ELEMENT OPERATORS !!!!!!!!!!!
 
 
-        ! form the tangent matrices
-        ! mechanical tangent matrix
-        Kuu = Kuu + w(intPt) * detJ *
-     &      (
-     &      matmul( transpose(BNLmat), matmul(Dmat,BNLmat) )
-     &      + matmul( matmul( transpose(Gmat),SIGMA_S ), Gmat )
-     &      )
 
+        !!!!!!!!!!!!!!!! RESIDUAL VECTOR CALCULATION !!!!!!!!!!!!!!!!!!
 
-        ! mechano-chemical tangent matrix
-        Kum = Kum + w(intpt) * detJ *
-     &            matmul( matmul( transpose(Gmat), dVectUM ),
-     &                    reshape(Nxi, [1, nNode]) )
-
-
-        ! chemo-mechanical tangent matrix
-        Kmu = Kmu + w(intPt) * detJ *
-     &            (
-     &            matmul( reshape( Nxi, [nNode, 1] ),
-     &                    matmul(dCwdotdF, Gmat) )
-     &            - matmul( matmul(dNdX, DmatMU), Gmat)
-     &            )
-
-        ! chemical tangent matrix
-        Kmm = Kmm + w(intPt) * detJ *
-     &            (
-     &            matmul( reshape(Nxi, [nNode, 1]),
-     &                    reshape(Nxi, [1, nNode]) ) * dCwdotdMU
-     &            - matmul( matmul(dNdX, dJwdMu),
-     &                      reshape(Nxi, [1, nNode]) )
-     &            + matmul( matmul(dNdX, MmatW), transpose(dNdX) )
-     &            )
 
         ! mechanical residual
-        Ru = Ru - w(intPt) * detJ *
+        Ru = Ru - w(intPt) * detJ * resFac *
      &            matmul( transpose(BNLmat), stressPK2 )
 
         ! chemical residual
         Rm = Rm + w(intPt) * detJ *
-     &          ( - reshape(Nxi, [nNode,1]) * dCwdt + matmul(dNdX,Jw) )
+     &           ( 
+     &            - NmatScalarT * dCwdt + matmul( BmatScalarT, Jw ) 
+     &           )
+
+        !!!!!!!!!!!!!! END RESIDUAL VECTOR CALCULATION !!!!!!!!!!!!!!!!
+
+
+
+        !!!!!!!!!!!!!!!! TANGENT MATRIX CALCULATION !!!!!!!!!!!!!!!!!!!
+
+        ! mechanical tangent matrix
+        Kuu = Kuu + w(intPt) * detJ * tanFac1 *
+     &      (
+     &        matmul( matmul( GmatT, SIGMA_S ), Gmat )
+     &        + matmul( BNLmatT, matmul( Dmat,BNLmat ) )
+     &      )
+
+
+        ! mechanical-solvent tangent matrix
+        Kum = Kum + w(intpt) * detJ * tanFac2 *
+     &        matmul( matmul( GmatT, aVectUM ), NmatScalar )
+
+
+        ! solvent-mechanical tangent matrix
+        Kmu = Kmu + w(intPt) * detJ *
+     &        (
+     &        matmul( matmul( NmatScalarT, dCwdotdF ), Gmat)
+     &        - matmul( matmul( BmatScalarT, DmatMU ), Gmat )
+     &        )
+
+
+        ! solvent tangent matrix
+        Kmm = Kmm + w(intPt) * detJ *
+     &        (
+     &        matmul( NmatScalarT, NmatScalar ) * dCwdotdMu
+     &        - matmul( matmul(BmatScalarT, dJwdMu), NmatScalar )
+     &        + matmul( matmul(BmatScalarT, MmatW), BmatScalar )
+     &        )
+
+
+        !! F-bar modification block for Kuu
+        if (fbarFlag .eq. .true.) then
+
+          ! form fourth-order QR0 and QR tensor
+          QR0Tensor = zero
+          QRTensor  = zero
+
+          !! fully-integrated HEX8 element 
+          if ( (jtype .eq. 2) .and. (nInt .eq. 8) ) then
+
+            do i = 1,nDim
+              do j = 1,nDim
+                do k = 1,nDim
+                  do l = 1,nDim
+                    do m = 1,nDim
+                      do n = 1,nDim
+                        do p = 1,nDim
+                          do q = 1,nDim
+                            QR0Tensor(i,j,k,l) = QR0Tensor(i,j,k,l)
+     &                          + third * F0InvT(k,l) *
+     &                            (
+     &                              Fbar(i,p) * Cmat(p,j,m,n)
+     &                              * Fbar(q,m) * Fbar(q,n)
+     &                              - Fbar(i,q) * stressTensorPK2(q,j)
+     &                            )
+
+                            QRTensor(i,j,k,l) = QRTensor(i,j,k,l)
+     &                          + third * FInvT(k,l) *
+     &                            (
+     &                              Fbar(i,p) * Cmat(p,j,m,n)
+     &                              * Fbar(q,m) * Fbar(q,n)
+     &                              - Fbar(i,q) * stressTensorPK2(q,j)
+     &                            )
+                          end do
+                        end do
+                      end do
+                    end do
+                  end do
+                end do
+              end do
+            end do
+
+          ! fully-integrated QUAD4-PE element
+          else if ( (jtype .eq. 4) .and. (nInt .eq. 4) ) then
+
+            do i = 1,nDim
+              do j = 1,nDim
+                do k = 1,nDim
+                  do l = 1,nDim
+                    do m = 1,nDim
+                      do n = 1,nDim
+                        do p = 1,nDim
+                          do q = 1,nDim
+                            QR0Tensor(i,j,k,l) = QR0Tensor(i,j,k,l)
+     &                          + half * Fbar(i,p) * Cmat(p,j,m,n)
+     &                          * Fbar(q,m) * Fbar(q,n) * F0InvT(k,l)
+
+                            QRTensor(i,j,k,l) = QRTensor(i,j,k,l)
+     &                          + half * Fbar(i,p) * Cmat(p,j,m,n)
+     &                          * Fbar(q,m) * Fbar(q,n) * FInvT(k,l)
+                          end do
+                        end do
+                      end do
+                    end do
+                  end do
+                end do
+              end do
+            end do
+
+          end if
+
+          ! reshape QR and QR0 tensor into matrix form
+          call unsymmMatrix(QR0Tensor,QR0mat)
+          call unsymmMatrix(QRTensor,QRmat)
+
+          ! modify the element tangent matrix
+          Kuu = Kuu + w(intPt) * detJ * tanFac2  *
+     &              (
+     &                matmul( GmatT, matmul(QR0mat,Gmat0) )
+     &                - matmul( GmatT, matmul(QRmat,Gmat) )
+     &              )
+        end if
+
+        !!!!!!!!!!!!!! END TANGENT MATRIX CALCULATION !!!!!!!!!!!!!!!!!
 
       end do                           ! end of integration point loop
 
-
-
-      !!!!!!!!!!!!!!!!!!!! FLUX BOUNDARY CONDITION !!!!!!!!!!!!!!!!!!!!
-
-      ! THIS PART OF THE CODE HAS NOT BEEN TESTED YET
-      ! the code development follows Chester et al. (IJSS, 2015) for
-      ! HEX8 and QUAD4 elements are available and can be extended
-      ! for other element types by making the code compact
-      ! apply traction/ pressure using the overlaying mechanical elements
-
-      if (ndload .gt. 0) then
-
-        ! loop over all the applied surface fluxes
-        do i = 1, ndload
-
-          face    = jdltyp(i,1)
-          flux    = adlmag(i,1)
-
-
-          if (jtype  .eq.  2) then        ! check flux faces for HEX8 element
-            if( (face .lt. 1) .and. (face .gt. 6) ) then
-              call msg%ferror( flag=error, src='uel_pe_hydrogel',
-     &             msg='Flux applied to unknown face: ', ia=face )
-              call xit
-            end if
-
-          elseif (jtype  .eq.  4) then    ! check flux faces for QUAD4 element
-            if( (face .lt. 1) .and. (face .gt. 4) ) then
-              call msg%ferror( flag=error, src='uel_pe_hydrogel',
-     &             msg='Flux applied to unknown face: ', ia=face )
-              call xit
-            endif
-
-          else                            ! flux BC not available for other element types
-            call msg%ferror( flag=error, src='uel_pe_hydrogel',
-     &               msg='Flux BC not available for element.', ia=jtype )
-            call xit
-          end if
-
-          ! get the surface integration points and weights
-          call getSurfGaussQuadrtr(face,wIntS,xiSurf)
-
-            ! loop over the surface integration points
-            do intPt = 1, nIntS
-
-              ! compute the surface area for 3D element
-              call computeSurfArea(xiSurf(intPt,:),face,coords,NxiS,dA)
-
-                Rm  = Rm
-     &              - wIntS(intPt)*dA*reshape(NxiS,[nNode,1])*flux
-            end do
-
-        end do
-        ! end the loop over the flux forces (ndload)
-
-      end if
-
-      !!!!!!!!!!!!!!!!!! END FLUX BOUNDARY CONDITION !!!!!!!!!!!!!!!!!!
 
 
       ! assemble the element tangent sub-matrices and residual sub-vectors
@@ -579,6 +730,10 @@
       rhs(1:NDOFEL,1)             = Relem(1:NDOFEL,1)
 
 
+    !   !! print matrix for debugging
+    !   call PRINT_MAT( Kuu, Kum, Kmu, Kmm, Ru, Rm, Amatrx, RHS,
+    !  &                 nDim, nNode, uDOFEL, mDOFEL, nDOFEl )
+
       end subroutine uel_hydrogel
 
 ! **********************************************************************
@@ -588,8 +743,8 @@
      &          nStress,nNode,jelem,intpt,coord_ip,props,nprops,
      &          jprops,njprops,matID,F,mu,dMudX,
      &          svars,nsvars,fieldVar,dfieldVar,npredf,
-     &          stressPK2,Jw,dCwdt,
-     &          Dmat,Cmat,dVectUM,dCwdotdF,DmatMU,dCwdotdMu,dJwdMu,
+     &          stressPK2,dCwdt,Jw,
+     &          Dmat,Cmat,aVectUM,dCwdotdF,DmatMU,dCwdotdMu,dJwdMu,
      &          MmatW)
 
       ! This material point subroutine calculates constitutive response
@@ -634,7 +789,7 @@
       real(wp), intent(out) :: dCwdt
       real(wp), intent(out) :: Dmat(nstress,nstress)
       real(wp), intent(out) :: Cmat(3,3,3,3)
-      real(wp), intent(out) :: dVectUM(nDim*nDim,1)
+      real(wp), intent(out) :: aVectUM(nDim*nDim,1)
       real(wp), intent(out) :: dCwdotdF(1,nDim*nDim)
       real(wp), intent(out) :: DmatMU(nDim,nDim*nDim)
       real(wp), intent(out) :: dCwdotdMu, dJwdMu(nDim,1)
@@ -644,7 +799,7 @@
 
 
       ! local variables (kinematic quantities)
-      real(wp)          :: detF, FInv(3,3), FinvT(3,3)
+      real(wp)          :: detF, FInv(3,3), FInvT(3,3)
       real(wp)          :: C(3,3), CInv(3,3), detC, trC
       real(wp)          :: B(3,3), Binv(3,3), detB
       real(wp)          :: strainTensorLagrange(3,3)
@@ -668,7 +823,7 @@
       real(wp)          :: dFdCwTensor(3,3)
       real(wp)          :: dSdCwTensor(3,3)
       real(wp)          :: FSTensorUM(3,3)
-      real(wp)          :: JwTensor(nDim,nDim,nDim)
+      real(wp)          :: dJwdFTensor(nDim,nDim,nDim)
       real(wp)          :: dCwdotdFTensor(3,3)
 
       ! intermeidate variables for post-processing and output
@@ -698,7 +853,7 @@
       ! initialize matrial stiffness tensors
       Cmat        = zero
       Dmat        = zero
-      JwTensor    = zero
+      dJwdFTensor = zero
 
       ! assign material properties to variables
       Rgas        = props(1)        ! universal gas constant
@@ -727,8 +882,8 @@
         call xit
       end if
 
-      FInv    = inv(F)
-      FInvT   = transpose(FInv)
+      FInv  = inv(F)
+      FInvT = transpose(Finv)
 
       C     = matmul(transpose(F),F)
       B     = matmul(F,transpose(F))
@@ -776,11 +931,10 @@
       ! (1.5) calculate time derivatives: dPhi/dt and dCw/dt
       dPhidt    = (phi_new-phi_old)/dtime
 
-      dCwdt     = - phi0*dPhidt/( Vw*(phi_new)**two )
-      ! dCwdt   = (Cw_new - Cw_old)/dtime
+      ! dCwdt     = - phi0*dPhidt/( Vw*(phi_new)**two )
+      dCwdt   = (Cw_new - Cw_old)/dtime
 
       !!!!!!!!!!!!!!!!!!!!! SOLVE INT PT VARIABLES !!!!!!!!!!!!!!!!!!!!!
-
 
 
       !!!!!!!!!!!!!!!!!!!!!! TANGENT CALCULATION !!!!!!!!!!!!!!!!!!!!!!!
@@ -788,10 +942,12 @@
       ! (2.1) calculate dCw/dPhi
       dCwdPhi = - (phi0/ (Vw*(phi_new)**two) )
 
+
       ! (2.2) calculate dG/dPhi (same as dMu/dPhi)
       dGdPhi = RT * (one - one/(one-phi_new) + two*chi*phi_new)
      &            - Kappa*Vw/phi_new
      &            + (Kappa*Vw/phi_new)*log(detF*phi_new/phi0)
+
 
       ! (2.3) calculate dPhi/dG (same as dPhi/dMu)
       dPhidG = one/dGdPhi
@@ -835,7 +991,7 @@
      &              + Kappa * phi0 * detFs * CInv(i,j) * CInv(k,l)
      &              + ( (phi0)**(two/three) * Gshear
      &              - Kappa * phi0 * detFs * log(detFe) )
-     &              * ( CInv(i,k) * CInv(j,l) + CInv(i,l) * CInv(j,k) )
+     &              * ( CInv(i,k) * CInv(j,l) + CInv(j,k) * CInv(i,l)  )
      &              + two * dSdCwTensor(i,j) * dCwdCTensor(k,l)
               end do
             end do
@@ -845,17 +1001,17 @@
       else if (matID .eq. 2) then          ! Arruda-Boyce elastomeric gel
         lam_c     = sqrt(trC/three)
         lam_r     = lam_c/lam_L
-        beta_0    = InvLangevin( (phi0**third)/ lam_L)
+        beta_0    = InvLangevin( (phi0**third)/ lam_L) 
         beta_c    = InvLangevin(lam_r)
         dBeta_c   = DInvLangevin(lam_r)
 
         ! (5.1) stress tensors
         stressTensorCauchy  = (1/detF) * ( (Gshear/three)*lam_r*beta_c*B
-     &        - ( (Gshear*lam_L)/three * beta_0 * (phi0)**(two/three)
+     &        - ( (Gshear*lam_L)/three * beta_0 * (phi0)**(two/three) 
      &        - Kappa*phi0*detFs*log(detFe) ) * ID3 )
 
         stressTensorPK2     = (Gshear/three) * lam_r * beta_c * ID3
-     &        - ( ( (phi0)**(two/three) *Gshear*lam_L )/three
+     &        - ( ( (phi0)**(two/three) *Gshear*lam_L )/three 
      &        - Kappa*phi0*detFs*log(detFe) ) * Cinv
 
         ! (5.2) calculate material tangent
@@ -867,7 +1023,7 @@
      &              + Gshear/(nine*lam_c**two)
      &              * ( dBeta_c- lam_r*beta_c ) * ID3(i,j)*ID3(k,l)
      &              + Kappa * phi0 * detFs * Cinv(i,j)*Cinv(k,l)
-     &              + ( (Gshear/three) * lam_L
+     &              + ( (Gshear/three) * lam_L 
      &              - Kappa * phi0 * detFs * log(detFe) )
      &              * ( Cinv(i,k)*Cinv(j,l) + Cinv(i,l)*Cinv(j,k) )
      &              + two * dSdCwTensor(i,j) * dCwdCTensor(k,l)
@@ -886,7 +1042,7 @@
       FSTensorUM  = matmul(F,dSdCwTensor) * dCwdMU
 
       ! (6.2) reshape into vector form
-      dVectUM     = reshape( FSTensorUM(1:nDim,1:nDim), shape(dVectUM) )
+      aVectUM     = reshape( FSTensorUM(1:nDim,1:nDim), shape(aVectUM) )
 
 
 
@@ -899,13 +1055,13 @@
 
 
       ! (7.3) calculate Jw_tensor
-      JwTensor = zero
+      dJwdFTensor = zero
       do i = 1,nDim
         do k = 1,nDim
           do l = 1,nDim
             do j = 1,nDim               ! summation over dummy index j
-              JwTensor(i,k,l) = JwTensor(i,k,l)
-     &            + (Dw*Cw_new)/RT
+              dJwdFTensor(i,k,l) = dJwdFTensor(i,k,l)
+     &            + (Dw*Cw_new)/RT 
      &            * ( FInv(i,k)*CInv(l,j) ) * dMUdX(j,1)
      &            - (Dw/RT) * CInv(i,j) * dMUdX(j,1) * dCwdFTensor(k,l)
             end do
@@ -914,11 +1070,11 @@
       end do
 
 
-      ! (7.4) map the third-order tensor, JwTensor, to a rank-2 matrix
+      ! (7.4) map the third-order tensor, dJwdFTensor, to a rank-2 matrix
       do i = 1, nDim
         do l = 1, nDim
           do k = 1, nDim
-            DmatMU(i,(l-1)*nDim+k) = JwTensor(i,k,l)
+            DmatMU(i,(l-1)*nDim+k) = dJwdFTensor(i,k,l)
           end do
         end do
       end do
@@ -934,8 +1090,8 @@
 
       ! (9.2) calculate of dCw_dot/dF and reshape it (dimension-dependent)
       dCwdotdFTensor  = dCwdFTensor/dtime
-      dCwdotdF        = reshape(dCwdotdFTensor(1:nDim,1:nDim),
-     &                          shape(dCwdotdF))
+      dCwdotdF        = reshape( dCwdotdFTensor(1:nDim,1:nDim),
+     &                          [1,nDim*nDim] )
 
 
       !!!!!!!!!!!!!!!!!!!!!! TANGENT CALCULATION !!!!!!!!!!!!!!!!!!!!!!!
@@ -996,7 +1152,7 @@
 
       else if ((abs(x) .ge. 0.84136_wp) .and. (abs(x) .lt. one)) then
         InvLangevin = one/(sign(one,x)-x)
-
+        
       else
         call msg%ferror(flag=error, src='umatArrudaBoyce:InvLangevin',
      &                  msg='Unbound argument.', ra = x)
@@ -1078,11 +1234,11 @@
      &      +  ( (Kappa*Vw)/two ) * ( log(detF*phi/phi0) )**two
 
         ! analytical gradient of the residual
-      if ( present(df) ) then
-        df = RT * ( one - ( one/(one - phi) ) + two*chi*phi )
+        if ( present(df) ) then
+          df = RT * ( one - ( one/(one - phi) ) + two*chi*phi )
      &            - (Kappa*Vw)/phi
      &            + ( (Kappa*Vw)/phi ) * log(detF*phi/phi0)
-      endif
+        endif
 
       end subroutine chemicalState
 
@@ -1190,13 +1346,15 @@
       real(wp), intent(out)           :: RHS, AMATRX
       real(wp), intent(out), optional :: SVARS, ENERGY, PNEWDT
 
-      integer             :: nDim, nStress
-      integer             :: nInt, nIntS, nPostVars
-      integer             :: uDOF, uDOFEL, mDOF, mDOFEL
+
       character(len=2)    :: analysis
       character(len=8)    :: abqProcedure
       logical             :: nlgeom
-
+      integer             :: nInt, nPostVars
+      integer             :: nDim, nStress
+      integer             :: uDOF, uDOFEL, mDOF, mDOFEL
+      
+      logical, parameter  :: dbgMode = .false.
       integer             :: lenJobName,lenOutDir
       character(len=256)  :: outDir
       character(len=256)  :: jobName
@@ -1210,12 +1368,15 @@
       energy        = zero
 
 
-      ! open a debug file for the current job
-      call getJobName(jobName,lenJobName)
-      call getOutDir(outDir,lenOutDir)
-      errFile = trim(outDir)//'\aaERR_'//trim(jobName)//'.dat'
-      dbgFile = trim(outDir)//'\aaDBG_'//trim(jobName)//'.dat'
-      call msg%fopen( errfile=errFile, dbgfile=dbgFile )
+       ! open a log files for the current job from Abaqus job
+      if (dbgMode .eq. .false.) then
+        call getJobName(jobName, lenJobName)
+        call getOutDir(outDir, lenOutDir)
+        errFile = trim(outDir)//'\aaERR_'//trim(jobName)//'.dat'
+        dbgFile = trim(outDir)//'\aaDBG_'//trim(jobName)//'.dat'
+        call msg%fopen( errfile=errFile, dbgfile=dbgFile )
+      end if
+
 
 
       ! change the LFLAGS criteria as needed (check abaqus UEL manual)
@@ -1258,21 +1419,14 @@
         call xit
       end if
 
-      ! no of surface integration points for calculating flux
-      if (jtype .eq. 2) then
-        nIntS = 4
-      else if (jtype .eq. 4) then
-        nIntS = 2
-      end if
-
       uDOF   = nDim
       uDOFEl = uDOF*nNode
       mDOF   = 1
       mDOFEL = mDOF*nNODE
 
       nInt      = jprops(1)
-      matID     = jprops(2)
-      nPostVars = jprops(3)
+      matID     = jprops(3)
+      nPostVars = jprops(4)
 
       ! array containing variables for post-processing
       if (.not. allocated(globalPostVars)) then
@@ -1281,8 +1435,6 @@
 
         call msg%finfo('---------------------------------------')
         call msg%finfo('--------- ABAQUS HYDROGEL UEL ---------')
-        call msg%finfo('---------------------------------------')
-        call msg%finfo('--- Abaqus Job: ', ch=trim(jobName))
         call msg%finfo('---------------------------------------')
         call msg%finfo('------- PROCEDURE       = ', ch=abqProcedure)
         call msg%finfo('------- ANALYSIS TYPE   = ', ch=analysis)
@@ -1304,13 +1456,12 @@
       ! return when Abaqus performs dummy step calculation with dt = 0
       if( dtime .eq. zero) return
 
-
+      
       call uel_hydrogel(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
      &    PROPS,NPROPS,COORDS,MCRD,NNODE,Uall,DUall,Vel,Accn,JTYPE,TIME,
      &    DTIME,KSTEP,KINC,JELEM,PARAMS,NDLOAD,JDLTYP,ADLMAG,PREDEF,
      &    NPREDF,LFLAGS,MLVARX,DDLMAG,MDLOAD,PNEWDT,JPROPS,NJPROPS,
-     &    PERIOD,NDIM,ANALYSIS,NSTRESS,NINT,NINTS,UDOF,UDOFEL,
-     &    MDOF,MDOFEL)
+     &    PERIOD,NDIM,ANALYSIS,NSTRESS,NINT,UDOF,UDOFEL,MDOF,MDOFEL)
 
       END SUBROUTINE UEL
 
