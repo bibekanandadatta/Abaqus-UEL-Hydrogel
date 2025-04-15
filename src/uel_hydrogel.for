@@ -127,15 +127,15 @@
 ! **********************************************************************
 
       ! make sure the relative directory is correct
-      include '../module/global_parameters.for'     ! global parameters module
-      include '../module/error_logging.for'         ! error/ debugging module
-      include '../module/linear_algebra.for'        ! linear algebra module
-      include '../module/nonlinear_solver.for'      ! nonlinear solver module
-      include '../module/lagrange_element.for'      ! Lagrange element module
-      include '../module/gauss_quadrature.for'      ! Guassian quadrature module
-      include '../module/surface_integration.for'   ! surface integration module
-      include '../module/solid_mechanics.for'       ! solid mechanics module
-      include '../module/post_processing.for'       ! post-processing module
+      include 'global_parameters.for'     ! global parameters module
+      include 'error_logging.for'         ! error/ debugging module
+      include 'linear_algebra.for'        ! linear algebra module
+      include 'nonlinear_solver.for'      ! nonlinear solver module
+      include 'lagrange_element.for'      ! Lagrange element module
+      include 'gauss_quadrature.for'      ! Guassian quadrature module
+      include 'surface_integration.for'   ! surface integration module
+      include 'solid_mechanics.for'       ! solid mechanics module
+      include 'post_processing.for'       ! post-processing module
 
 ! **********************************************************************
 ! **********************************************************************
@@ -352,7 +352,6 @@
       dmuNode(1:mDOFEL,1)     = duAllMat(uDOF+1,1:mDOFEL)
 
 
-
       call eyeMat(ID)                       ! create an identity matrix w/ size of nDim
 
 
@@ -479,6 +478,7 @@
         BmatScalar  = transpose(dNdX)
         BmatScalarT = dNdX
 
+
         !!!!!!!!!!!!! END CALCULATING ELEMENT OPERATORS !!!!!!!!!!!!!!!
 
 
@@ -538,6 +538,7 @@
           tanFac2 = one
         end if
 
+        
 
         ! call material point subroutine (UMAT) for the neutral gel
         call umat_hydrogel(kstep,kinc,time,dtime,nDim,analysis,
@@ -548,8 +549,7 @@
      &          Dmat,Cmat,aVectUM,dCwdotdF,DmatMU,dCwdotdMu,dJwdMu,
      &          MmatW)
 
-       !!!!!!!!!!!!!!! END CONSTITUTIVE CALCULATION !!!!!!!!!!!!!!!!!!
-
+        !!!!!!!!!!!!!!! END CONSTITUTIVE CALCULATION !!!!!!!!!!!!!!!!!!
 
 
         !!!!!!!!!!!!! FORM ADDITIONAL ELEMENT OPERATORS !!!!!!!!!!!!!!!
@@ -574,7 +574,7 @@
           end do
         end do
 
-        BNLmat  = matmul(Bmat,SIGMA_F)
+        BNLmat  = matmul(Bmat,transpose(SIGMA_F))
         BNLmatT = transpose(BNLmat)
 
         !!!!!!!!!! END FORMING ADDITIONAL ELEMENT OPERATORS !!!!!!!!!!!
@@ -730,10 +730,6 @@
       rhs(1:NDOFEL,1)             = Relem(1:NDOFEL,1)
 
 
-    !   !! print matrix for debugging
-    !   call PRINT_MAT( Kuu, Kum, Kmu, Kmm, Ru, Rm, Amatrx, RHS,
-    !  &                 nDim, nNode, uDOFEL, mDOFEL, nDOFEl )
-
       end subroutine uel_hydrogel
 
 ! **********************************************************************
@@ -809,6 +805,7 @@
       real(wp)          :: phi_old, phi_new, dPhidt, Cw_old, Cw_new
       real(wp)          :: vars(nprops+2)
       real(wp)          :: detFe, detFs
+      logical           :: ivarFlag
 
       ! local variables (stress tensors)
       real(wp)          :: stressTensorPK1(3,3)
@@ -849,6 +846,8 @@
       integer           :: i, j, k, l
 
       type(logger)      :: msg
+      type(options)     :: solverOpts
+
 
       ! initialize matrial stiffness tensors
       Cmat        = zero
@@ -895,6 +894,7 @@
       strainTensorLagrange  = half*(C-ID3)
       strainTensorEuler     = half*(ID3-Binv)
 
+
       !!!!!!!!!!!!!!!!!!!!!!!!! KINEMATIC PART !!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -914,8 +914,15 @@
       vars(nprops+1)  = detF
       vars(nprops+2)  = mu
 
-      call fzero( chemicalState, phi_old, phi_new,
-     &            phiMin, phiMax, jac=.true., vars=vars)
+      solverOpts%maxIter  = 500
+      solverOpts%tolfx    = 1.0e-8_wp
+      solverOpts%tolx     = 1.0e-8_wp
+      solverOpts%algo     = 'Newton'
+
+      call fzero( chemicalState, phi_old, phi_new, phiMin, phiMax,
+     &            jac=.true., vars=vars, opts=solverOpts,
+     &            sflag=ivarFlag)
+
 
       ! update the state variable for next step (or iteration)
       svars(intPt)    = phi_new
@@ -967,13 +974,12 @@
      &              * Kappa * Vw * (log(detFe)-one) * CInv
 
 
-      ! (4) dS/dCw (a symmetric second order tensor)
-      dSdCwTensor = Kappa * Vw * (log(detFe)-one) * CInv
 
 
-      ! (5) stress tensor and material tangent
+      ! stress tensor and material tangent
       if (matID .eq. 1) then                  ! neo-hookean elstomeric gel
-        ! (5.1) stress tensors
+
+        ! (4) stress tensors
         stressTensorPK2 = Gshear * ( ID3 - (phi0)**(two/three) * CInv )
      &                  + Kappa * phi0 * detFs * log(detFe) * CInv
 
@@ -981,6 +987,8 @@
      &                      * ( Gshear * (B - (phi0)**(two/three) * ID3)
      &                      + Kappa * phi0 * detFs * log(detFe) * ID3 )
 
+        ! (5.2) dS/dCw (a symmetric second order tensor)
+        dSdCwTensor = Kappa * Vw * (log(detFe)-one) * CInv
 
         ! (5.2) calculate material tangent
         do i = 1,3
@@ -1005,7 +1013,7 @@
         beta_c    = InvLangevin(lam_r)
         dBeta_c   = DInvLangevin(lam_r)
 
-        ! (5.1) stress tensors
+        ! (4) stress tensors
         stressTensorCauchy  = (1/detF) * ( (Gshear/three)*lam_r*beta_c*B
      &        - ( (Gshear*lam_L)/three * beta_0 * (phi0)**(two/three) 
      &        - Kappa*phi0*detFs*log(detFe) ) * ID3 )
@@ -1013,6 +1021,9 @@
         stressTensorPK2     = (Gshear/three) * lam_r * beta_c * ID3
      &        - ( ( (phi0)**(two/three) *Gshear*lam_L )/three 
      &        - Kappa*phi0*detFs*log(detFe) ) * Cinv
+
+        ! (5.1) dS/dCw (a symmetric second order tensor)
+        dSdCwTensor = Kappa * Vw * (log(detFe)-one) * CInv
 
         ! (5.2) calculate material tangent
         do i = 1,3
