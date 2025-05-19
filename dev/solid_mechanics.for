@@ -8,8 +8,8 @@
 
       module solid_mechanics
 
-      ! no of symmetric and unSymmmetric stress tensor components (3D)
-      integer, parameter    :: nSymm = 6, nUnSymm = 9
+      ! no of symmetric and unSymmetric stress tensor components (3D)
+      integer, parameter    :: nSymm = 6, nUnsymm = 9
 
       contains
 
@@ -20,6 +20,7 @@
       ! rank-2 matrix form. For example, this operation is necessary to 
       ! reshape 4th-order first elasticity tensor dP/dF (derivative of 
       ! PK-I stress wrt deformation gradient) to a matrix form.
+      ! use this for 3D and 2D plane strain/stress cases (not axisymmetry)
 
         use global_parameters, only: wp, zero
 
@@ -53,6 +54,7 @@
       ! This subroutine reshapes a general 2nd order tensor (unsymmetric)
       ! to a column-ordered vector form. For example, this can be used
       ! to reshape PK-I stress tensor to a vector form.
+      ! use this for 3D and 2D plane strain/stress cases (not axisymmetry)
 
         use global_parameters, only: wp, zero
 
@@ -73,12 +75,13 @@
       subroutine unsymmVectorTruncate(vect3D,vect2D)
       ! This subroutine reshapes a 9x1 unsymmetric vector (deformation gradient 
       ! or PK-I stress) to a 4x1 or 5x1 vector based on the type of analysis
+      ! output order: P11, P21, P12, P22, P33
 
         use global_parameters, only: wp, zero
 
         implicit none
 
-        real(wp), intent(in)    :: vect3D(nUnSymm,1)
+        real(wp), intent(in)    :: vect3D(nUnsymm,1)
         real(wp), intent(out)   :: vect2D(:,:)
         integer                 :: nStress
 
