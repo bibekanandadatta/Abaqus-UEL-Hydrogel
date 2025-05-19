@@ -9,7 +9,7 @@
       module solid_mechanics
 
       ! no of symmetric and unSymmmetric stress tensor components (3D)
-      integer, parameter    :: nSymm = 6, nUnsymmm = 9
+      integer, parameter    :: nSymm = 6, nUnSymm = 9
 
       contains
 
@@ -78,8 +78,8 @@
 
         implicit none
 
-        real(wp), intent(in)    :: vect3D(nUnsymmm,1)
-        real(wp), intent(out)    :: vect2D(:,:)
+        real(wp), intent(in)    :: vect3D(nUnSymm,1)
+        real(wp), intent(out)   :: vect2D(:,:)
         integer                 :: nStress
 
         nStress     = size(vect2D,1)

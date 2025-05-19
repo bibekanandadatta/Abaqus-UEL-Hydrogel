@@ -826,7 +826,7 @@
       ! intermeidate variables for post-processing and output
       real(wp)          :: strainVectLagrange(nSymm,1)
       real(wp)          :: strainVectEuler(nSymm,1)
-      real(wp)          :: stressVectPK1(nUnsymmm,1)
+      real(wp)          :: stressVectPK1(nUnSymm,1)
       real(wp)          :: stressVectPK2(nSymm,1)
       real(wp)          :: stressVectCauchy(nSymm,1)
       real(wp)          :: VoigtMat(nSymm,nSymm)
