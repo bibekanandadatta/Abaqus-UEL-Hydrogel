@@ -60,18 +60,26 @@
 
       !! element type, element no, dimension, etc.
       JELEM     = 1           ! no of elements in patch test
-      JTYPE     = 4           ! type of element
+      JTYPE     = 6           ! type of element (4: AX, 6: PE)
       elemLen   = 1.0e-3_wp   ! element side length
 
-      ! nInt : no of volume integration point, nPostVars: no of post-processed variables
       if (JTYPE .eq. 4) then
+        nDim      = 2               ! spatial dimension of the problem
+        nStress   = 4               ! independent stress quantities
+        nNode     = 4               ! no of nodes of the element
+        nOrder    = 1               ! polynomial order of the lagrangian element
+        nInt      = 4               ! no of integration points
+        nPostVars = 2*nStress + 1
+        fileName  = 'hydrogel_Q4AX.dat'
+
+      else if (JTYPE .eq. 6) then
         nDim      = 2               ! spatial dimension of the problem
         nStress   = 3               ! independent stress quantities
         nNode     = 4               ! no of nodes of the element
         nOrder    = 1               ! polynomial order of the lagrangian element
         nInt      = 4               ! no of integration points
         nPostVars = 2*nStress + 1
-        fileName  = 'hydrogel_debug_QUAD4PE.dat'
+        fileName  = 'hydrogel_Q4PE.dat'
       else
         write(*,'(A)')  'Element unavailable for debugging: ', jtype
         stop
@@ -125,10 +133,8 @@
       DTIME   = 1.0e-3_wp
 
 
-      if (JTYPE .EQ. 4) then
-        COORDS(1,:) = [0, 1, 1, 0]
-        COORDS(2,:) = [0, 0, 1, 1]
-      end if
+      COORDS(1,:) = [0, 1, 1, 0]
+      COORDS(2,:) = [0, 0, 1, 1]
 
       COORDS  = COORDS*elemLen
 
@@ -136,9 +142,9 @@
       !! material properties
       Rgas        = 8.3145_wp         ! Universal gas constant
       theta       = 298.0_wp          ! Absolute temperature (K)
-      phi0        = 0.99_wp           ! Initial polymer volume fraction
+      phi0        = 0.999_wp          ! Initial polymer volume fraction
       rho         = 1100.0_wp         ! Density of the gel
-      Gshear      = 100.0e3_wp        ! Shear modulus
+      Gshear      = 71.0e3_wp         ! Shear modulus
       Kappa       = 50.0_wp*Gshear    ! Bulk modulus
       lam_L       = 0.0_wp            ! Locking stretch (only for AB model)
       Vp          = 8.92e-3_wp        ! Molar volume of polymer
@@ -167,6 +173,12 @@
      &                  zero,   zero,   initMU,
      &                  zero,   zero,   initMU]
 
+
+      !! define the "simulated" nodal solutions (or boundary )
+    !   Uall(1:nDOFEL) = [zero,   zero,   initMU,
+    !  &                  zero,   zero,   initMU,
+    !  &                  elemLen,elemLen,   initMU,
+    !  &                  zero,   zero,   initMU]
 
 
       !! call the UEL subroutine

@@ -1028,11 +1028,6 @@
 
         end if
 
-        if (detA .le. zero) then
-          call msg%ferror(flag=warn, src='detMat_std',
-     &          msg='Negative determinant.', ra=detA)
-        end if
-
       end subroutine detMat_std
 
 ! **********************************************************************
@@ -1368,11 +1363,6 @@
           detA = detA * mat(i,i)
           if ( ipiv(i) .ne. i ) detA = - detA
         end do
-
-        if (detA .le. zero) then
-          call msg%ferror(flag=warn, src='detMat_lapack',
-     &          msg='Negative determinant.', ra=detA)
-        end if
 
       end subroutine detMat_lapack
 

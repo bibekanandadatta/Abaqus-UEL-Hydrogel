@@ -1,6 +1,6 @@
 *Heading
-** simulation of free-swelling of 2 mm x 2mm square plate under plane strain
-** using symmetry a quarter of the plate (1mm x 1mm) was modeled using U4 element
+** simulation of free-swelling of 2 mm x 2mm swuare plate under plane strain condition
+** using symmetry a quarter of the plate (1mm x 1mm) was modeled using U6 element
 ** It starts from the dry state to a swollen equilibrium state
 ************************************************************************
 ** PARAMETERS (SI UNIT SYSTEM)
@@ -11,7 +11,7 @@ nDim        = 2
 nStress     = 3
 nnode       = 4
 nInt        = 4
-fbar        = 1
+fbar        = 0
 matID       = 1
 matProps    = 12
 intProps    = 4
@@ -125,9 +125,9 @@ dtMin   = 1.0e-6
 79, 0.00100000005, 0.000297407794
 80, 0.00100000005, 0.000153235917
 81, 0.00100000005,           0.
-*User Element,Type=U4,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm
+*User Element,Type=U6,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm
 1,2,11
-*Element, type=U4
+*Element, type=U6
 1,  1,  2, 11, 10
 2,  2,  3, 12, 11
 3,  3,  4, 13, 12

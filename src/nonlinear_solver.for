@@ -143,7 +143,7 @@
 
         end do
 
-        call msg%ferror(flag=error, src='newton',
+        call msg%ferror(flag=warn, src='newton',
      &          msg='Execeeded maximum iterations.')
         sflag = .false.
 
@@ -305,7 +305,7 @@
 
         end do
 
-        call msg%ferror(flag=error, src='newton_hybrid',
+        call msg%ferror(flag=warn, src='newton_hybrid',
      &          msg='Execeeded maximum iterations.')
         sflag = .false.
 
@@ -409,8 +409,8 @@
 
         end do
 
-        call msg%ferror(flag=error, src='fsolve',
-     &            msg='Execeeded maximum iterations.')
+        call msg%ferror(flag=warn, src='fsolve',
+     &          msg='Execeeded maximum iterations.')
         sflag = .false.
 
 
