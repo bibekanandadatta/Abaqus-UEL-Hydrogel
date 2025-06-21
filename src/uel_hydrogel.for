@@ -4,8 +4,7 @@
 !           fully coupled chemo-mechanics of non-ionic hydrogels
 !   the formulation uses PK-II stress based total Lagrangian framework
 ! with F-bar modification for fully-integrated HEX8 and QUAD4-PE element
-! currently supports first-order coupled elements for 3D and 2D-PE cases
-!    FUTURE TODO: add first-order elements for 2D-PS and 2D-AX cases
+! currently supports first-order elements for 3D, 2D-AX, and 2D-PE cases
 ! **********************************************************************
 !                     BIBEKANANDA DATTA (C) MAY 2024
 !                 JOHNS HOPKINS UNIVERSITY, BALTIMORE, MD
@@ -48,7 +47,6 @@
 !     uvar(nStress+1:2*nStress)     Euler-Almansi strain tensor components
 !     uvar(2*nStress+1)             Polymer volume fraction (phi)
 ! **********************************************************************
-!
 !               VARIABLES TO BE UPDATED WITHIN THE SUBROUTINE
 !
 !     RHS(i,NRHS)                   Right hand side vector
@@ -104,7 +102,6 @@
 !     MLVARX                        Dimension variable
 !     MDLOAD                        Total number of distributed loads and/or fluxes defined on this element
 !     PERIOD                        Time period of the current step
-!
 ! **********************************************************************
 ! **********************************************************************
 
@@ -610,9 +607,9 @@
      & NDIM,ANALYSIS,NSTRESS,NINT,UDOF,UDOFEL,MDOF,MDOFEL)
 
       ! this subroutine computes the AMATRX and RHS for 3D elements and
-      ! 2D plane strain and plane stress (not available now) elements
-      ! axisymmetric elements are placed in a seperate subroutine as
-      ! that requires different matrix operators and tensor conversion
+      ! 2D plane strain elements. axisymmetric elements are placed in a
+      ! seperate subroutine as that requires different matrix operators 
+      ! and tensor conversion
 
       use global_parameters
       use error_logging
