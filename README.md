@@ -34,3 +34,29 @@ Make sure that the user subroutine and input file are in the same directory. Usi
 abaqus interactive double analysis ask_delete=off job=<your_job_name> input=<input_file_name.inp> user=../src/uel_hydrogel.for
 ```
 Specify the variable names (inside < >) in the above command as needed. For additional information on executing user subroutines, check the Abaqus user manual.
+
+
+
+## Citation
+
+If you use this repository (documentation or source code), please consider citing this from the following:
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15725221.svg)](https://doi.org/10.5281/zenodo.15725221)
+
+APA format:
+```
+Datta, B., & Nguyen, Thao D. (2025, June 23). A finite element model and Abaqus user element (UEL) implementation of hydrogel chemo-mechanics. Zenodo. https://doi.org/10.5281/zenodo.15725221.
+```
+
+BibTeX:
+``` bibtex
+@misc{dattaFiniteElementModel2025,
+  author       = {Datta, Bibekananda and Nguyen, Thao D.},
+  title        = {{A finite element model and Abaqus user element (UEL) implementation of hydrogel chemo-mechanics}},
+  month        = jun,
+  year         = 2025,
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.15725221},
+  url          = {https://doi.org/10.5281/zenodo.15725221}
+}
+```
