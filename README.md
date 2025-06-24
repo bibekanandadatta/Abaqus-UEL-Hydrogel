@@ -41,11 +41,11 @@ Specify the variable names (inside < >) in the above command as needed. For addi
 
 If you use this repository (documentation or source code), please consider citing this from the following:
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15725221.svg)](https://doi.org/10.5281/zenodo.15725221)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15725220.svg)](https://doi.org/10.5281/zenodo.15725220)
 
 APA format:
 ```
-Datta, B., & Nguyen, Thao D. (2025, June 23). A finite element model and Abaqus user element (UEL) implementation of hydrogel chemo-mechanics. Zenodo. https://doi.org/10.5281/zenodo.15725221.
+Datta, B., & Nguyen, Thao D. (2025, June 23). A finite element model and Abaqus user element (UEL) implementation of hydrogel chemo-mechanics. Zenodo. https://doi.org/10.5281/zenodo.15725220.
 ```
 
 BibTeX:
@@ -56,7 +56,7 @@ BibTeX:
   month        = jun,
   year         = 2025,
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.15725221},
-  url          = {https://doi.org/10.5281/zenodo.15725221}
+  doi          = {10.5281/zenodo.15725220},
+  url          = {https://doi.org/10.5281/zenodo.15725220}
 }
 ```
