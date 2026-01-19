@@ -246,8 +246,6 @@
       real(wp)          :: lam_c, lam_r, beta_0, beta_c, dBeta_c
 
       integer           :: i, j, k, l, m, n
-
-      type(logger)      :: msg
       type(options)     :: solverOpts
 
 
@@ -755,7 +753,6 @@
       integer           :: i, j, k, l, m, n, p, q, intPt
       integer           :: nstatev
       type(element)     :: hydrogel
-      type(logger)      :: msg
 
       ! initialize hydrogel element
       hydrogel  = element(nDim=nDim, analysis=analysis,
@@ -1394,7 +1391,6 @@
       integer           :: i, j, k, l, m, n, p, q, intPt
       integer           :: nstatev
       type(element)     :: hydrogel
-      type(logger)      :: msg
 
       ! initialize hydrogel element
       hydrogel  = element(nDim=nDim, analysis=analysis,
@@ -1967,34 +1963,33 @@
       real(wp), intent(out), optional :: SVARS, ENERGY, PNEWDT
 
 
-      character(len=2)    :: analysis
-      character(len=8)    :: abqProcedure
-      logical             :: nlgeom
-      integer             :: nInt, nPostVars
-      integer             :: nDim, nStress
-      integer             :: uDOF, uDOFEL, mDOF, mDOFEL
+      character(len=2)      :: analysis
+      character(len=8)      :: abqProcedure
+      logical               :: nlgeom
+      integer               :: nInt, nPostVars
+      integer               :: nDim, nStress
+      integer               :: uDOF, uDOFEL, mDOF, mDOFEL
 
-      logical, parameter  :: devMode = .false.
-      integer             :: lenJobName,lenOutDir
-      character(len=256)  :: outDir
-      character(len=256)  :: jobName
-      character(len=512)  :: errFile, dbgFile
-      type(logger)        :: msg
+      logical, parameter    :: devMode = .false.
+      integer               :: lenJobName,lenOutDir
+      character(len=256)    :: outDir
+      character(len=256)    :: jobName
+      character(len=512)    :: errFile
+
+
+      ! open a log file for the current job from Abaqus job
+      if (devMode .eq. .false.) then
+        call getJobName(jobName, lenJobName)
+        call getOutDir(outDir, lenOutDir)
+        errFile = trim(outDir)//'\aaERR_'//trim(jobName)//'.dat'
+        call msg%fopen( errfile=errFile )
+      end if
 
 
       ! initialize primary output variable to be zero
       amatrx        = zero
       rhs(:,nrhs)   = zero
       energy        = zero
-
-       ! open a log files for the current job from Abaqus job
-      if (devMode .eq. .false.) then
-        call getJobName(jobName, lenJobName)
-        call getOutDir(outDir, lenOutDir)
-        errFile = trim(outDir)//'\aaERR_'//trim(jobName)//'.dat'
-        dbgFile = trim(outDir)//'\aaDBG_'//trim(jobName)//'.dat'
-        call msg%fopen( errfile=errFile, dbgfile=dbgFile )
-      end if
 
 
 
@@ -2083,7 +2078,7 @@
       end if
 
       ! return when Abaqus performs dummy step calculation with dt = 0
-      if( dtime .eq. zero) return
+      if( dtime .eq. zero ) return
 
       ! call the first-order polyelectrolyte gel element subroutine
       select case (jtype)
@@ -2097,7 +2092,7 @@
 
       case (3, 4)
         ! axisymmetric subroutine for (3) TRI3 and (4) QUAD4-AX
-      call gel_axisymmetric(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
+        call gel_axisymmetric(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
      &    PROPS,NPROPS,COORDS,MCRD,NNODE,Uall,DUall,Vel,Accn,JTYPE,TIME,
      &    DTIME,KSTEP,KINC,JELEM,PARAMS,NDLOAD,JDLTYP,ADLMAG,PREDEF,
      &    NPREDF,LFLAGS,MLVARX,DDLMAG,MDLOAD,PNEWDT,JPROPS,NJPROPS,
