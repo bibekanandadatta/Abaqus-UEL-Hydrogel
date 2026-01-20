@@ -606,7 +606,7 @@
 
       ! this subroutine computes the AMATRX and RHS for 3D elements and
       ! 2D plane strain elements. axisymmetric elements are placed in a
-      ! seperate subroutine as that requires different matrix operators 
+      ! seperate subroutine as that requires different matrix operators
       ! and tensor conversion
 
       use global_parameters
@@ -1918,9 +1918,7 @@
       end module hydrogel_element
 
 ! **********************************************************************
-! **********************************************************************
 ! ****************** ABAQUS USER ELEMENT SUBROUTINE ********************
-! **********************************************************************
 ! **********************************************************************
 
       SUBROUTINE UEL(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
@@ -1970,28 +1968,11 @@
       integer               :: nDim, nStress
       integer               :: uDOF, uDOFEL, mDOF, mDOFEL
 
-      logical, parameter    :: devMode = .false.
-      integer               :: lenJobName,lenOutDir
-      character(len=256)    :: outDir
-      character(len=256)    :: jobName
-      character(len=512)    :: errFile
-
-
-      ! open a log file for the current job from Abaqus job
-      if (devMode .eq. .false.) then
-        call getJobName(jobName, lenJobName)
-        call getOutDir(outDir, lenOutDir)
-        errFile = trim(outDir)//'\aaERR_'//trim(jobName)//'.dat'
-        call msg%fopen( errfile=errFile )
-      end if
-
 
       ! initialize primary output variable to be zero
       amatrx        = zero
       rhs(:,nrhs)   = zero
       energy        = zero
-
-
 
       ! change the LFLAGS criteria as needed (check abaqus UEL manual)
       if((lflags(1) .eq. 72) .or. (lflags(1) .eq. 73)) then
@@ -2043,17 +2024,17 @@
       end if
 
 
-      uDOF   = nDim
-      uDOFEl = uDOF*nNode
-      mDOF   = 1
-      mDOFEL = mDOF*nNODE
+      uDOF      = nDim
+      uDOFEl    = uDOF*nNode
+      mDOF      = 1
+      mDOFEL    = mDOF*nNODE
 
       nInt      = jprops(1)
       matID     = jprops(3)
       nPostVars = jprops(4)
 
       ! array containing variables for post-processing
-      if (.not. allocated(globalPostVars)) then
+      if ( .not. allocated(globalPostVars) ) then
 
         allocate(globalPostVars(numElem,nInt,nPostVars))
 
@@ -2083,16 +2064,16 @@
       ! call the first-order polyelectrolyte gel element subroutine
       select case (jtype)
       case (1, 2, 5, 6)
-        ! (1) TET4, (2) HEX8, (5) TRI3-PE, and (6) QUAD4-PE
-        call gel_general(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
+      ! (1) TET4, (2) HEX8, (5) TRI3-PE, and (6) QUAD4-PE
+      call gel_general(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
      &    PROPS,NPROPS,COORDS,MCRD,NNODE,Uall,DUall,Vel,Accn,JTYPE,TIME,
      &    DTIME,KSTEP,KINC,JELEM,PARAMS,NDLOAD,JDLTYP,ADLMAG,PREDEF,
      &    NPREDF,LFLAGS,MLVARX,DDLMAG,MDLOAD,PNEWDT,JPROPS,NJPROPS,
      &    PERIOD,NDIM,ANALYSIS,NSTRESS,NINT,UDOF,UDOFEL,MDOF,MDOFEL)
 
       case (3, 4)
-        ! axisymmetric subroutine for (3) TRI3 and (4) QUAD4-AX
-        call gel_axisymmetric(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
+      ! axisymmetric subroutine for (3) TRI3 and (4) QUAD4-AX
+      call gel_axisymmetric(RHS,AMATRX,SVARS,ENERGY,NDOFEL,NRHS,NSVARS,
      &    PROPS,NPROPS,COORDS,MCRD,NNODE,Uall,DUall,Vel,Accn,JTYPE,TIME,
      &    DTIME,KSTEP,KINC,JELEM,PARAMS,NDLOAD,JDLTYP,ADLMAG,PREDEF,
      &    NPREDF,LFLAGS,MLVARX,DDLMAG,MDLOAD,PNEWDT,JPROPS,NJPROPS,
@@ -2104,12 +2085,87 @@
         call xit
       end select
 
+      RETURN
+
       END SUBROUTINE UEL
 
 ! **********************************************************************
+! ************** ABAQUS USER DATABASE FILE I/O SUBROUTINE **************
+! **********************************************************************
+
+      SUBROUTINE UEXTERNALDB(LOP,LRESTART,TIME,DTIME,KSTEP,KINC)
+
+! **********************************************************************
+!     This Abaqus/Standard user subroutine file is used for external
+!     file i/o operation. User can open, close, write to external files
+!     at different stages of the simulation through this subroutine
+! **********************************************************************
+
+      use global_parameters
+      use error_logging
+
+      DIMENSION                TIME(2)
+
+      integer, intent(in)   :: lop, lrestart, kstep, kinc
+      real(wp), intent(in)  :: time, dtime
+
+      real(wp)              :: currentTime, totalTime
+      integer               :: lenJobName,lenOutDir
+      character(len=256)    :: jobName, outDir
+      character(len=512)    :: errFile
+
+
+      ! possible LOP argument parameter values
+      integer, parameter    :: startAnalysis    = 0
+      integer, parameter    :: startIncrement   = 1
+      integer, parameter    :: endIncrement     = 2
+      integer, parameter    :: endAnalysis      = 3
+      integer, parameter    :: restartAnalysis  = 4
+      integer, parameter    :: startStep        = 5
+      integer, parameter    :: endStep          = 6
+
+      ! possible LRESTART argument parameter values
+      integer, parameter    :: restartIgnore    = 0
+      integer, parameter    :: restartWrite     = 1
+      integer, parameter    :: restartOverwrite = 2
+
+
+      currentTime           = time(1)
+      totalTime             = time(2)
+
+      if (LOP .eq. startAnalysis) then
+
+        call getJobName(jobName, lenJobName)
+        call getOutDir(outDir, lenOutDir)
+        errFile = trim(outDir)//'\aaERR_'//trim(jobName)//'.dat'
+        call msg%fopen(errfile=errFile)
+
+      else if (LOP .eq. startIncrement) then
+        return
+
+      else if (LOP .eq. endIncrement) then
+        return
+
+      else if (LOP .eq. endAnalysis) then
+        call msg%finfo('Abaqus job completed successfully.')
+
+      else if (LOP .eq. restartAnalysis) then
+        return
+
+      else if (LOP .eq. startStep) then
+        return
+
+      else if (LOP .eq. endStep) then
+        return
+
+      end if
+
+      RETURN
+
+      END SUBROUTINE UEXTERNALDB
+
 ! **********************************************************************
 ! ************** ABAQUS USER OUTPUT VARIABLES SUBROUTINE ***************
-! **********************************************************************
 ! **********************************************************************
 
        SUBROUTINE UVARM(UVAR,DIRECT,T,TIME,DTIME,CMNAME,ORNAME,
@@ -2142,6 +2198,8 @@
 
       ! assign the stored global variables to the UVAR for Abaqus to process
       uvar(1:nuvarm)  = globalPostVars(noel-elemOffset,npt,1:nuvarm)
+
+      RETURN
 
       END SUBROUTINE UVARM
 
