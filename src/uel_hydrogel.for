@@ -1,5 +1,5 @@
 ! **********************************************************************
-! *********** Abaqus/ STANDARD USER ELEMENT SUBROUTINE (UEL) ***********
+! *********** Abaqus/Standard USER ELEMENT SUBROUTINE (UEL) ************
 ! **********************************************************************
 !           Fully coupled chemo-mechanics of non-ionic hydrogels
 !   the formulation uses PK-II stress based total Lagrangian framework

@@ -1,5 +1,5 @@
 ! **********************************************************************
-! *************** POLYELECTROLYTE HYDROGEL ELEMENT MODULE **************
+! ***************** HYDROGEL CONSTITUTIVE MODEL MODULE *****************
 ! **********************************************************************
 !     Author: Bibekananda Datta (C) May 2024. All Rights Reserved.
 !  This module and dependencies are shared under 3-clause BSD license
