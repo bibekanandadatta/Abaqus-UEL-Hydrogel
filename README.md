@@ -3,7 +3,7 @@
 Abaqus/Standard user element subroutines for coupled chemo-mechanics of hydrogel. The documentation provide the necessary details of the coupled theory, constitutive model, and finite element implementation procedure.
 
 > [!WARNING]
-> If you are new in the realm of finite element programming, especially developing user element codes in Abaqus, simpler examples of Abaqus UEL subroutine implementation which can also be a good starting point are: [Abaqus-UEL-Elasticity](https://github.com/bibekananda-datta/Abaqus-UEL-Elasticity) and [Abaqus-UEL-Hyperelasticity](https://github.com/bibekananda-datta/Abaqus-UEL-Hyperelasticity).
+> If you are new in the realm of finite element programming, especially developing user element codes in Abaqus, simpler examples of Abaqus UEL subroutine implementation which can also be a good starting point are: [Abaqus-UEL-Elasticity](https://github.com/bibekanandadatta/Abaqus-UEL-Elasticity) and [Abaqus-UEL-Hyperelasticity](https://github.com/bibekanandadatta/Abaqus-UEL-Hyperelasticity).
 
 
 

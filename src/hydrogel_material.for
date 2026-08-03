@@ -86,7 +86,7 @@
       implicit none
 
       ! minimum and maximum value for polymer volume fraction
-      real(wp), parameter :: phiMin = 0.05_wp, phiMax = 0.9999_wp
+      real(wp), parameter :: phiMin = 0.01_wp, phiMax = 0.9999_wp
 
       ! input arguments to the subroutine
       character(len=2), intent(in)  :: analysis
@@ -240,6 +240,13 @@
       call fzero( chemicalState, phi_old, phi, phiMin, phiMax,
      &            jac=.true., vars=vars, opts=solverOpts,
      &            sflag=ivarFlag)
+
+      if (.not. ivarFlag) then
+        call msg%ferror(flag=error, src='neohookean_flory',
+     &      msg='Local iteration for phi failed.',
+     &      ivec=[jelem,intpt])
+        call xit
+      end if
 
 
       ! update the state variable for next step (or iteration)
@@ -395,6 +402,8 @@
               dJwdFTensor(i,k,l) = dJwdFTensor(i,k,l)
      &            + (Dw*Cw)/RT
      &            * ( FInv(i,k)*CInv(l,j) ) * dMUdX(j,1)
+     &            + (Dw*Cw)/RT
+     &            * ( CInv(i,l)*FInv(j,k) ) * dMUdX(j,1)
      &            - (Dw/RT) * CInv(i,j) * dMUdX(j,1) * dCwdFTensor(k,l)
             end do
           end do

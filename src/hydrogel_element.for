@@ -364,7 +364,7 @@
         !!!!!!!!!!!!!!!!!! CONSTITUTIVE CALCULATION !!!!!!!!!!!!!!!!!!!
 
         ! calculate the coordinate of integration point
-        coord_ip = matmul(Nmat, reshape(coords, [nDOFEL, 1]))
+        coord_ip = matmul(Nmat, reshape(coords, [uDOFEL, 1]))
 
 
         ! calculate deformation gradient and deformation tensors
@@ -561,22 +561,26 @@
                           do q = 1,nDim
                             QR0Tensor(i,j,k,l) = QR0Tensor(i,j,k,l)
      &                          + third * F0InvT(k,l) *
-     &                            (
-     &                              Fbar(i,p) * CTensor(p,j,m,n)
-     &                              * Fbar(q,m) * Fbar(q,n)
-     &                              - Fbar(i,q) * stressTensorPK2(q,j)
-     &                            )
+     &                            Fbar(i,p) * CTensor(p,j,m,n)
+     &                            * Fbar(q,m) * Fbar(q,n)
 
                             QRTensor(i,j,k,l) = QRTensor(i,j,k,l)
      &                          + third * FInvT(k,l) *
-     &                            (
-     &                              Fbar(i,p) * CTensor(p,j,m,n)
-     &                              * Fbar(q,m) * Fbar(q,n)
-     &                              - Fbar(i,q) * stressTensorPK2(q,j)
-     &                            )
+     &                            Fbar(i,p) * CTensor(p,j,m,n)
+     &                            * Fbar(q,m) * Fbar(q,n)
                           end do
                         end do
                       end do
+                    end do
+
+                    do q = 1,nDim
+                      QR0Tensor(i,j,k,l) = QR0Tensor(i,j,k,l)
+     &                    - third * F0InvT(k,l)
+     &                    * Fbar(i,q) * stressTensorPK2(q,j)
+
+                      QRTensor(i,j,k,l) = QRTensor(i,j,k,l)
+     &                    - third * FInvT(k,l)
+     &                    * Fbar(i,q) * stressTensorPK2(q,j)
                     end do
                   end do
                 end do
@@ -1067,7 +1071,7 @@
         !!!!!!!!!!!!!!!!!! CONSTITUTIVE CALCULATION !!!!!!!!!!!!!!!!!!!
 
          ! calculate the coordinate of integration point
-        coord_ip = matmul(Nmat, reshape(coords, [nDOFEL, 1]))
+        coord_ip = matmul(Nmat, reshape(coords, [uDOFEL, 1]))
 
 
         ! calculate deformation gradient and deformation tensors
@@ -1155,7 +1159,8 @@
         Amat(5,5)       = CTensor(3,3,3,3)
 
         ! reshape FSTensorUM into vector form
-        aVectUM   = reshape( FSTensorUM(1:nDim,1:nDim), [nDim*nDim,1] )
+        aVectUM(1:nDim*nDim,1) =
+     &      reshape( FSTensorUM(1:nDim,1:nDim), [nDim*nDim] )
         aVectUM(nDim*nDim+1,1)  = FSTensorUM(3,3)
 
         ! map the third-order tensor, dJw/dF, to a rank-2 matrix
@@ -1175,8 +1180,8 @@
         dCwdotdFTensor  = dCwdFTensor/dtime
 
         ! reshape dCwdotdFtensor into a vector
-        dCwdotdF(:,:)   =
-     &        reshape( dCwdotdFTensor(1:nDim,1:nDim),[1,nDim*nDim] )
+        dCwdotdF(1,1:nDim*nDim) =
+     &        reshape( dCwdotdFTensor(1:nDim,1:nDim),[nDim*nDim] )
 
         dCwdotdF(1,5)   = dCwdotdFTensor(3,3)
 
@@ -1207,7 +1212,7 @@
 
 
         ! mechanical-solvent tangent matrix
-        Kum = Kum + w(intpt) * detJ * AR *
+        Kum = Kum + w(intpt) * detJ * AR * tanFac2 *
      &        matmul( matmul( GmatT, aVectUM ), NmatScalar )
 
 

@@ -7,35 +7,35 @@ offset      = 100000
 
 if jtype == 1:
     oldElemStr  = '*Element, type=C3D4'
-    newElemStr  = '*User Element,Type=U1,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm\n'\
+    newElemStr  = '*User Element,Type=U1,Nodes=4,Coordinates=3,Properties=12,Iproperties=4,Variables=1,Unsymm\n'\
                   '1,2,3,11\n'\
                   '*Element, type=U1'
 elif jtype == 2:
     oldElemStr  = '*Element, type=C3D8'
-    newElemStr  = '*User Element,Type=U2,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm\n'\
+    newElemStr  = '*User Element,Type=U2,Nodes=8,Coordinates=3,Properties=12,Iproperties=4,Variables=8,Unsymm\n'\
                   '1,2,3,11\n'\
                   '*Element, type=U2'
 
 elif jtype == 3:
     oldElemStr  = '*Element, type=CAX3'
-    newElemStr  = '*User Element,Type=U3,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm\n'\
+    newElemStr  = '*User Element,Type=U3,Nodes=3,Coordinates=2,Properties=12,Iproperties=4,Variables=1,Unsymm\n'\
                   '1,2,11\n'\
                   '*Element, type=U3'
 elif jtype == 4:
     oldElemStr  = '*Element, type=CAX4'
-    newElemStr  = '*User Element,Type=U4,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm\n'\
+    newElemStr  = '*User Element,Type=U4,Nodes=4,Coordinates=2,Properties=12,Iproperties=4,Variables=4,Unsymm\n'\
                   '1,2,11\n'\
                   '*Element, type=U4'
-elif jtype == 2:
+elif jtype == 5:
     oldElemStr  = '*Element, type=CPE3'
-    newElemStr  = '*User Element,Type=U3,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm\n'\
+    newElemStr  = '*User Element,Type=U5,Nodes=3,Coordinates=2,Properties=12,Iproperties=4,Variables=1,Unsymm\n'\
                   '1,2,11\n'\
-                  '*Element, type=U3'
-elif jtype == 4:
+                  '*Element, type=U5'
+elif jtype == 6:
     oldElemStr  = '*Element, type=CPE4'
-    newElemStr  = '*User Element,Type=U4,Nodes=<nnode>,Coordinates=<nDim>,Properties=<matProps>,Iproperties=<intProps>,Variables=<nsvars>,Unsymm\n'\
+    newElemStr  = '*User Element,Type=U6,Nodes=4,Coordinates=2,Properties=12,Iproperties=4,Variables=4,Unsymm\n'\
                   '1,2,11\n'\
-                  '*Element, type=U4'
+                  '*Element, type=U6'
 else:
     print("element is not supported")
 
